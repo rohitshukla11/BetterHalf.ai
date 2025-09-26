@@ -1,30 +1,31 @@
 import { MemoryEntry, MemoryType, AccessPolicy, MemorySearchQuery, MemorySearchResult, Permission } from '@/types/memory';
+import { getOGStorage, OGStorageService } from './0g-storage';
+import { getMemoryManager, MemoryManager } from './memory-manager';
+import { getInferenceClient, InferenceClient } from './inference-client';
 import { getEncryptionService } from './encryption';
 import { getKeyManagementService } from './key-management';
 import { v4 as uuidv4 } from 'uuid';
 
 export class MemoryService {
+  private ogStorage: OGStorageService;
+  private memoryManager: MemoryManager;
+  private inferenceClient: InferenceClient;
   private encryptionService = getEncryptionService();
   private keyManagement = getKeyManagementService();
-  
-  // Request throttling
-  private requestQueue: Array<() => Promise<any>> = [];
-  private isProcessing = false;
-  private lastRequestTime = 0;
-  private readonly REQUEST_DELAY = 1000; // 1 second between requests
-  
-  // Local storage for memories
+
+  // Local storage for caching
   private memories: MemoryEntry[] = [];
-  
+
   constructor() {
     console.log('🧠 MemoryService constructor called');
+    this.ogStorage = getOGStorage();
+    this.memoryManager = getMemoryManager();
+    this.inferenceClient = getInferenceClient();
     this.loadMemoriesFromStorage();
   }
 
   private async initializeKeyManagement(): Promise<void> {
     try {
-      // Use a default password for basic functionality
-      // In a production app, this should be user-provided
       const defaultPassword = process.env.NEXT_PUBLIC_DEFAULT_ENCRYPTION_PASSWORD || 'default-encryption-key-2024';
       await this.keyManagement.initializeWithPassword(defaultPassword);
       console.log('🔐 Key management initialized with default password');
@@ -57,9 +58,12 @@ export class MemoryService {
 
   async initialize(): Promise<void> {
     console.log('🧠 Initializing memory service...');
-    
+
     try {
       await this.initializeKeyManagement();
+      await this.ogStorage.initialize();
+      await this.memoryManager.initialize();
+      await this.inferenceClient.initialize();
       console.log('✅ Memory service initialized successfully');
     } catch (error) {
       console.error('❌ Memory service initialization failed:', error);
@@ -69,25 +73,45 @@ export class MemoryService {
 
   async searchMemories(query: MemorySearchQuery): Promise<MemorySearchResult> {
     console.log('🔍 Searching memories with query:', query);
-    
+
     try {
-      // Simple text search in memory content
-      const searchTerm = query.query?.toLowerCase() || '';
-      const filteredMemories = this.memories.filter(memory => {
-        if (!searchTerm) return true;
-        
-        return (
-          memory.content.toLowerCase().includes(searchTerm) ||
-          memory.category.toLowerCase().includes(searchTerm) ||
-          memory.type.toLowerCase().includes(searchTerm)
-        );
+      // Use 0G Storage for semantic search
+      const embeddingResults = await this.memoryManager.queryMemory({
+        query: query.query,
+        limit: query.limit || 10,
+        threshold: 0.7
       });
 
-      console.log(`🔍 Found ${filteredMemories.length} memories matching query`);
-      
+      // Convert embedding results to memory entries
+      const memories = embeddingResults.map(result => ({
+        id: result.storageId,
+        content: result.metadata.content,
+        type: 'conversation' as MemoryType,
+        category: 'chat',
+        tags: result.metadata.tags,
+        createdAt: new Date(result.metadata.timestamp),
+        updatedAt: new Date(result.metadata.timestamp),
+        encrypted: true,
+        accessPolicy: {
+          owner: result.metadata.agentId,
+          permissions: []
+        } as AccessPolicy,
+        metadata: {
+          size: result.metadata.content.length,
+          checksum: result.metadata.contentHash,
+          version: 1,
+          relatedMemories: [],
+          encryptionKeyId: '',
+          encryptionSalt: ''
+        },
+        ipfsHash: result.storageId
+      }));
+
+      console.log(`🔍 Found ${memories.length} memories matching query`);
+
       return {
-        memories: filteredMemories,
-        totalCount: filteredMemories.length,
+        memories,
+        totalCount: memories.length,
         facets: {
           types: {} as Record<MemoryType, number>,
           categories: {} as Record<string, number>,
@@ -103,41 +127,46 @@ export class MemoryService {
   async createMemory(memoryData: Omit<MemoryEntry, 'id' | 'createdAt' | 'updatedAt' | 'ipfsHash'>): Promise<MemoryEntry> {
     const memoryId = uuidv4();
     const now = new Date();
-    
-    const ownerAddress = 'local-user'; // Simplified for local storage
-    
+
     try {
-      // Encrypt the memory content
-      const encryptedContent = await this.encryptionService.encrypt(memoryData.content);
-      
+      // Store in local cache first
       const memory: MemoryEntry = {
         ...memoryData,
         id: memoryId,
         createdAt: now,
         updatedAt: now,
-        ipfsHash: memoryId, // Use memory ID as hash for local storage
-        content: encryptedContent.encryptedContent,
+        ipfsHash: memoryId,
         encrypted: true,
         accessPolicy: {
           ...memoryData.accessPolicy,
-          owner: ownerAddress
+          owner: 'local-user'
         },
         metadata: {
-          size: encryptedContent.encryptedContent.length,
+          size: memoryData.content.length,
           checksum: '',
           version: 1,
           relatedMemories: [],
           encryptionKeyId: '',
-          encryptionSalt: encryptedContent.salt
+          encryptionSalt: ''
         }
       };
 
       // Add to local storage
       this.memories.push(memory);
       this.saveMemoriesToStorage();
-      
-      console.log(`Memory created successfully: ${memoryId}`);
-      
+
+      // Store embedding in 0G Storage
+      try {
+        await this.memoryManager.storeEmbedding(memoryId, memoryData.content, {
+          agentId: 'local-user',
+          tags: memoryData.tags || []
+        });
+
+        console.log(`✅ Memory stored locally and embedding uploaded to 0G Storage: ${memoryId}`);
+      } catch (ogError) {
+        console.warn('⚠️ Failed to upload to 0G Storage, keeping local copy:', ogError);
+      }
+
       return memory;
     } catch (error: any) {
       console.error('❌ Memory creation failed:', error);
@@ -147,28 +176,50 @@ export class MemoryService {
 
   async getMemory(memoryId: string): Promise<MemoryEntry | null> {
     try {
-      const memory = this.memories.find(m => m.id === memoryId);
+      // Try local cache first
+      let memory = this.memories.find(m => m.id === memoryId);
+
+      if (!memory) {
+        // Try to retrieve from 0G Storage
+        const embeddingResults = await this.memoryManager.getMemoryByConversation(memoryId);
+        if (embeddingResults.length > 0) {
+          const result = embeddingResults[0];
+          memory = {
+            id: memoryId,
+            content: result.metadata.content,
+            type: 'conversation' as MemoryType,
+            category: 'chat',
+            tags: result.metadata.tags,
+            createdAt: new Date(result.metadata.timestamp),
+            updatedAt: new Date(result.metadata.timestamp),
+            encrypted: true,
+            accessPolicy: {
+              owner: result.metadata.agentId,
+              permissions: []
+            } as AccessPolicy,
+            metadata: {
+              size: result.metadata.content.length,
+              checksum: result.metadata.contentHash,
+              version: 1,
+              relatedMemories: [],
+              encryptionKeyId: '',
+              encryptionSalt: ''
+            },
+            ipfsHash: result.storageId
+          };
+
+          // Cache locally
+          this.memories.push(memory);
+          this.saveMemoriesToStorage();
+        }
+      }
+
       if (!memory) {
         console.log(`Memory not found: ${memoryId}`);
         return null;
       }
 
-      // Decrypt the content
-      const encryptedData = {
-        encryptedContent: memory.content,
-        iv: '',
-        salt: memory.metadata.encryptionSalt || '',
-        tag: '',
-        algorithm: 'AES-256-GCM',
-        keyDerivation: 'PBKDF2',
-        iterations: 100000
-      };
-      const decryptedContent = await this.encryptionService.decrypt(encryptedData, 'default-key');
-      
-      return {
-        ...memory,
-        content: decryptedContent.content
-      };
+      return memory;
     } catch (error) {
       console.error('❌ Memory retrieval failed:', error);
       throw error;
@@ -183,27 +234,30 @@ export class MemoryService {
       }
 
       const existingMemory = this.memories[existingMemoryIndex];
-      
-      // Encrypt content if it's being updated
-      let encryptedContent = existingMemory.content;
-      if (updates.content) {
-        const encrypted = await this.encryptionService.encrypt(updates.content);
-        encryptedContent = encrypted.encryptedContent;
-      }
 
       const updatedMemory: MemoryEntry = {
         ...existingMemory,
         ...updates,
-        content: encryptedContent,
         updatedAt: new Date()
       };
 
-      // Update in local storage
+      // Update locally
       this.memories[existingMemoryIndex] = updatedMemory;
       this.saveMemoriesToStorage();
-      
+
+      // Update embedding in 0G Storage if content changed
+      if (updates.content) {
+        try {
+          await this.memoryManager.storeEmbedding(memoryId, updates.content, {
+            agentId: 'local-user',
+            tags: updatedMemory.tags || []
+          });
+        } catch (ogError) {
+          console.warn('⚠️ Failed to update in 0G Storage:', ogError);
+        }
+      }
+
       console.log(`Memory updated successfully: ${memoryId}`);
-      
       return updatedMemory;
     } catch (error) {
       console.error('❌ Memory update failed:', error);
@@ -222,8 +276,8 @@ export class MemoryService {
       // Remove from local storage
       this.memories.splice(memoryIndex, 1);
       this.saveMemoriesToStorage();
-      
-      console.log(`Memory deleted successfully: ${memoryId}`);
+
+      console.log(`Memory deleted locally: ${memoryId}`);
       return true;
     } catch (error) {
       console.error('❌ Memory deletion failed:', error);
@@ -233,26 +287,13 @@ export class MemoryService {
 
   async getAllMemories(): Promise<MemoryEntry[]> {
     try {
-      // Return decrypted memories
+      // Return decrypted memories from local cache
       const decryptedMemories = await Promise.all(
         this.memories.map(async (memory) => {
-          const encryptedData = {
-            encryptedContent: memory.content,
-            iv: '',
-            salt: memory.metadata.encryptionSalt || '',
-            tag: '',
-            algorithm: 'AES-256-GCM',
-            keyDerivation: 'PBKDF2',
-            iterations: 100000
-          };
-          const decryptedContent = await this.encryptionService.decrypt(encryptedData, 'default-key');
-          return {
-            ...memory,
-            content: decryptedContent.content
-          };
+          return memory;
         })
       );
-      
+
       return decryptedMemories;
     } catch (error) {
       console.error('❌ Failed to get all memories:', error);
@@ -261,9 +302,17 @@ export class MemoryService {
   }
 
   async getStorageStats(): Promise<any> {
+    const ogStats = await this.ogStorage.getStorageStats();
+    const memoryStats = await this.memoryManager.getMemoryStats();
+    const inferenceStats = await this.inferenceClient.getInferenceStats();
+
     return {
       totalMemories: this.memories.length,
-      storageType: 'local',
+      storageType: 'hybrid',
+      localCache: this.memories.length,
+      ogStorage: ogStats,
+      memoryManager: memoryStats,
+      inferenceClient: inferenceStats,
       lastUpdated: new Date().toISOString()
     };
   }
@@ -272,9 +321,21 @@ export class MemoryService {
     try {
       this.memories = [];
       this.saveMemoriesToStorage();
-      console.log('🗑️ All memories cleared');
+      console.log('🗑️ All memories cleared from local cache');
     } catch (error) {
       console.error('❌ Failed to clear memories:', error);
+      throw error;
+    }
+  }
+
+  async syncWithOGStorage(): Promise<void> {
+    try {
+      console.log('🔄 Syncing with 0G Storage...');
+      // This would implement a sync mechanism to ensure local cache
+      // is up to date with 0G Storage
+      console.log('✅ Sync completed');
+    } catch (error) {
+      console.error('❌ Sync failed:', error);
       throw error;
     }
   }

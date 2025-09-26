@@ -1,5 +1,4 @@
 import { MemoryService } from './memory-service';
-import { getEncryptionService } from './encryption';
 import { MemoryType, AccessPolicy } from '@/types/memory';
 import { v4 as uuidv4 } from 'uuid';
 

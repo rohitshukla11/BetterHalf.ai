@@ -166,7 +166,53 @@ export class MemoryService {
     console.log('🔍 Searching memories with query:', query);
 
     try {
-      // Use 0G Storage for semantic search
+      // Use the working direct contract approach
+      const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/memories-from-contract`);
+      
+      if (response.ok) {
+        const contractResult = await response.json();
+        if (contractResult.memories && contractResult.memories.length > 0) {
+          console.log(`🔍 Found ${contractResult.memories.length} memories from direct contract query`);
+          
+          // Apply query filters if needed
+          let filteredMemories = contractResult.memories;
+          
+          if (query.query) {
+            filteredMemories = filteredMemories.filter((memory: MemoryEntry) =>
+              memory.content.toLowerCase().includes(query.query.toLowerCase()) ||
+              memory.tags?.some(tag => tag.toLowerCase().includes(query.query.toLowerCase()))
+            );
+          }
+          
+          if (query.type) {
+            filteredMemories = filteredMemories.filter((memory: MemoryEntry) => memory.type === query.type);
+          }
+          
+          if (query.category) {
+            filteredMemories = filteredMemories.filter((memory: MemoryEntry) => memory.category === query.category);
+          }
+          
+          if (query.tags && query.tags.length > 0) {
+            filteredMemories = filteredMemories.filter((memory: MemoryEntry) =>
+              query.tags!.some(tag => memory.tags?.includes(tag))
+            );
+          }
+          
+          // Apply limit and offset
+          const startIndex = query.offset || 0;
+          const endIndex = startIndex + (query.limit || 20);
+          filteredMemories = filteredMemories.slice(startIndex, endIndex);
+          
+          return {
+            memories: filteredMemories,
+            totalCount: filteredMemories.length,
+            facets: this.calculateFacets(filteredMemories)
+          };
+        }
+      }
+
+      // Fallback to local search if contract query fails
+      console.log('🔍 Contract query failed or returned no results, falling back to local search');
       const embeddingResults = await this.memoryManager.queryMemory({
         query: query.query,
         limit: query.limit || 10,
@@ -198,21 +244,43 @@ export class MemoryService {
         ipfsHash: result.storageId
       }));
 
-      console.log(`🔍 Found ${memories.length} memories matching query`);
+      console.log(`🔍 Found ${memories.length} memories from local search`);
 
       return {
         memories,
         totalCount: memories.length,
-        facets: {
-          types: {} as Record<MemoryType, number>,
-          categories: {} as Record<string, number>,
-          tags: {} as Record<string, number>
-        }
+        facets: this.calculateFacets(memories)
       };
     } catch (error) {
       console.error('❌ Memory search failed:', error);
       throw error;
     }
+  }
+
+
+
+
+  private calculateFacets(memories: MemoryEntry[]) {
+    const facets = {
+      types: {} as Record<MemoryType, number>,
+      categories: {} as Record<string, number>,
+      tags: {} as Record<string, number>
+    };
+
+    memories.forEach(memory => {
+      // Count types
+      facets.types[memory.type] = (facets.types[memory.type] || 0) + 1;
+      
+      // Count categories
+      facets.categories[memory.category] = (facets.categories[memory.category] || 0) + 1;
+      
+      // Count tags
+      memory.tags?.forEach(tag => {
+        facets.tags[tag] = (facets.tags[tag] || 0) + 1;
+      });
+    });
+
+    return facets;
   }
 
   async createMemory(memoryData: Omit<MemoryEntry, 'id' | 'createdAt' | 'updatedAt' | 'ipfsHash'>): Promise<MemoryEntry> {
@@ -259,10 +327,13 @@ export class MemoryService {
 
         // Update memory with 0G storage information
         if (embeddingResult.explorerUrl) {
-          memory.explorerUrl = embeddingResult.explorerUrl;
+          memory.walrusUrl = embeddingResult.explorerUrl; // This is now the Walrus explorer URL
         }
         if (embeddingResult.transactionHash) {
           memory.transactionHash = embeddingResult.transactionHash;
+        }
+        if (embeddingResult.storageId) {
+          memory.ipfsHash = embeddingResult.storageId; // Store the blob ID
         }
 
         console.log(`✅ Memory stored locally and embedding uploaded to 0G Storage: ${memoryId}`);

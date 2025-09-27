@@ -28,9 +28,11 @@ export class MemoryIndexer {
 
   private static async initialize(): Promise<void> {
     try {
-      // Only initialize in browser environment or when explicitly configured
-      if (typeof window === 'undefined' && !process.env.NEXT_PUBLIC_0G_PRIVATE_KEY) {
-        console.log('🔗 Server environment: 0G contract indexing not available');
+      // Allow server-side initialization when PRIVATE_KEY or NEXT_PUBLIC_0G_PRIVATE_KEY is set
+      const serverSide = typeof window === 'undefined';
+      const envPrivateKey = process.env.NEXT_PUBLIC_0G_PRIVATE_KEY || process.env.PRIVATE_KEY;
+      if (serverSide && !envPrivateKey) {
+        console.log('🔗 Server environment: 0G contract indexing disabled (no PRIVATE_KEY)');
         return;
       }
 
@@ -104,7 +106,14 @@ export class MemoryIndexer {
       const result = await this.zgIndexingService.indexMemory(memory, vector);
       
       if (result.success) {
-        console.log(`⛓️  Memory indexed on-chain: ${result.transactionHash?.slice(0, 10)}...`);
+        console.log(`⛓️  Memory indexed on-chain: ${result.transactionHash?.slice(0, 10)}... (pending)`);
+        
+        // Update memory object with blockchain explorer URL (pending transaction)
+        if (result.transactionHash) {
+          memory.explorerUrl = `${process.env.NEXT_PUBLIC_0G_EXPLORER_URL || 'https://chainscan-testnet.0g.ai'}/tx/${result.transactionHash}`;
+          memory.transactionHash = result.transactionHash;
+          console.log(`🔗 0G Explorer URL: ${memory.explorerUrl}`);
+        }
         
         // Update local config with transaction info
         this.updateIndexConfig(memory.id, {
@@ -120,12 +129,12 @@ export class MemoryIndexer {
   }
   
   /**
-   * Update local metadata index (localStorage-based)
+   * Update local metadata index (localStorage-based or server-side fallback)
    */
   private static updateLocalMetadataIndex(memory: MemoryEntry): void {
     if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
-      // In server environment, we could use a database or file system
-      console.log('📚 Server environment: Would store in persistent index');
+      // In server environment, skip local indexing but log the action
+      console.log(`📚 Server environment: Memory ${memory.id.slice(0, 8)}... would be indexed locally`);
       return;
     }
     
@@ -147,7 +156,7 @@ export class MemoryIndexer {
    */
   private static updateLocalVectorIndex(memoryId: string, vector: number[], metadata: MemoryEntry): void {
     if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
-      console.log('📊 Server environment: Would store vector in vector DB');
+      console.log(`📊 Server environment: Vector for ${memoryId.slice(0, 8)}... would be indexed in vector DB`);
       return;
     }
     
@@ -301,6 +310,8 @@ export class MemoryIndexer {
     transactionHash?: string;
     contractHash?: string;
     indexedAt?: string;
+    verified?: boolean;
+    verifiedAt?: string;
   }): void {
     if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
       return;

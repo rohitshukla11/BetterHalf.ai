@@ -100,29 +100,43 @@ export class WalrusStorageService {
     try {
       console.log(`📤 Storing ${data.length} bytes on Walrus network...`);
 
-      // Create FormData with the blob (Node.js environment)
-      const FormData = require('form-data');
-      const formData = new FormData();
-      
-      // In Node.js, append the buffer directly
-      formData.append('file', data, {
-        filename: 'data.bin',
-        contentType: 'application/octet-stream',
-      });
+      // Helper to perform upload with a specific epochs value
+      const doUpload = async (epochs: number) => {
+        const FormData = require('form-data');
+        const formData = new FormData();
+        formData.append('file', data, {
+          filename: 'data.bin',
+          contentType: 'application/octet-stream',
+        });
+        return await axios.put(
+          `${this.config.publisherUrl}/v1/blobs?epochs=${epochs}`,
+          formData,
+          {
+            headers: {
+              ...formData.getHeaders(),
+            },
+            timeout: 30000,
+            maxContentLength: Infinity,
+            maxBodyLength: Infinity,
+          }
+        );
+      };
 
-      // Store the blob
-      const response = await axios.put(
-        `${this.config.publisherUrl}/v1/blobs?epochs=${this.config.epochs}`,
-        formData,
-        {
-          headers: {
-            ...formData.getHeaders(),
-          },
-          timeout: 30000, // 30 second timeout
-          maxContentLength: Infinity,
-          maxBodyLength: Infinity,
+      // First attempt with configured epochs
+      let response;
+      try {
+        response = await doUpload(this.config.epochs);
+      } catch (err: any) {
+        const walrusMsg = err?.response?.data?.error?.message || err?.message || '';
+        const status = err?.response?.status;
+        // If publisher lacks WAL coins, retry once with epochs=1 (cheaper)
+        if (status === 500 && /WAL coins/i.test(walrusMsg)) {
+          console.warn('⚠️ Walrus publisher indicates insufficient WAL balance. Retrying with epochs=1...');
+          response = await doUpload(1);
+        } else {
+          throw err;
         }
-      );
+      }
 
       const result = response.data;
 
@@ -153,7 +167,7 @@ export class WalrusStorageService {
         size: data.length,
         epochs: this.config.epochs,
         endEpoch: endEpoch || 0,
-        explorerUrl: suiRef ? `https://suiscan.xyz/testnet/object/${suiRef}` : undefined,
+        explorerUrl: blobId ? `https://walruscan.com/testnet/blob/${blobId}` : undefined,
       };
 
     } catch (error: any) {
@@ -161,6 +175,10 @@ export class WalrusStorageService {
       if (error.response) {
         console.error('   Status:', error.response.status);
         console.error('   Data:', error.response.data);
+      }
+      const walrusMsg = error?.response?.data?.error?.message || error?.message || '';
+      if (/WAL coins/i.test(walrusMsg)) {
+        throw new Error('Walrus storage failed: insufficient WAL balance on publisher');
       }
       throw new Error(`Walrus storage failed: ${error?.message}`);
     }

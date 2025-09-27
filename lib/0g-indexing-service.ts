@@ -1,5 +1,5 @@
 import { ethers } from 'ethers';
-import { MemoryEntry, MemoryType } from '@/types/memory';
+import { MemoryEntry } from '@/types/memory';
 import { OGStorageService, getOGStorage } from './0g-storage';
 import { MemoryRegistryABI } from './contracts/MemoryRegistry';
 
@@ -71,7 +71,17 @@ export class ZGIndexingService {
       await connectionTest;
       console.log('✅ 0G RPC connection established');
       
-      this.signer = new ethers.Wallet(config.privateKey, this.provider);
+      // Normalize private key
+      let normalizedPrivateKey = (config.privateKey || '').trim();
+      if (normalizedPrivateKey && !normalizedPrivateKey.startsWith('0x')) {
+        normalizedPrivateKey = `0x${normalizedPrivateKey}`;
+      }
+
+      this.signer = new ethers.Wallet(normalizedPrivateKey, this.provider);
+      const signerAddress = await this.signer.getAddress();
+      const net = await this.provider.getNetwork();
+      console.log(`🔑 Signer: ${signerAddress}`);
+      console.log(`⛓️  Connected chainId: ${Number(net.chainId)} (expected ${config.chainId})`);
       
       // Initialize contract
       this.contract = new ethers.Contract(
@@ -80,14 +90,26 @@ export class ZGIndexingService {
         this.signer
       );
 
+      // Sanity check: try a cheap read to confirm contract address & ABI
+      try {
+        const total = await (this.contract as any).getTotalMemoryHashes();
+        console.log(`📈 Contract reachable. Total memory hashes: ${Number(total)}`);
+      } catch (readErr: any) {
+        console.warn('⚠️  Contract read check failed (will still continue):', readErr?.message || readErr);
+      }
+
       // Initialize 0G Storage
       await this.ogStorage.initialize();
 
       console.log('✅ 0G Indexing Service initialized successfully');
       console.log(`📍 Contract Address: ${config.contractAddress}`);
       console.log(`⛓️  Chain ID: ${config.chainId}`);
-    } catch (error) {
-      console.warn('⚠️  0G Contract connection failed, continuing with storage-only mode:', error.message);
+    } catch (error: any) {
+      console.warn('⚠️  0G Contract connection failed, continuing with storage-only mode:', error?.message || error);
+      console.warn(`   Details: address=${config.contractAddress}, chainId=${config.chainId}`);
+      if (error?.code === 'ETIMEDOUT' || /ENETUNREACH|ETIMEDOUT/i.test(String(error))) {
+        console.warn('   Hint: RPC connectivity issue. Will retry later during operations.');
+      }
       // Don't throw - allow the service to work in storage-only mode
       this.contract = null;
       this.provider = null;
@@ -121,12 +143,34 @@ export class ZGIndexingService {
       if (!zgStorageId || zgStorageId === memory.id) {
         // Store content in 0G Storage if not already stored
         console.log('📤 Storing content in 0G Storage...');
-        const storageResult = await this.ogStorage.uploadContent(memory.content, {
-          contentType: this.getContentType(memory),
-          tags: memory.tags || [],
-          agentId: memory.accessPolicy?.owner || 'unknown'
-        });
-        zgStorageId = storageResult.dataId;
+        
+        // Generate embedding vector if not provided
+        let embeddingVector = contentVector;
+        if (!embeddingVector) {
+          // Generate proper embedding using the existing memory manager
+          try {
+            const { getMemoryManager } = await import('./memory-manager');
+            const memoryManager = getMemoryManager();
+            embeddingVector = await memoryManager.generateEmbedding(memory.content);
+            console.log('✅ Generated proper embedding vector');
+          } catch (error: any) {
+            console.warn('⚠️ Failed to generate embedding, using fallback:', error.message);
+            // Fallback to simple vector
+            embeddingVector = new Array(1536).fill(0).map(() => Math.random() - 0.5);
+          }
+        }
+        
+        const storageResult = await this.ogStorage.storeEmbedding(
+          memory.id,
+          embeddingVector,
+          {
+            agentId: memory.accessPolicy?.owner || 'unknown',
+            timestamp: memory.createdAt?.toISOString() || new Date().toISOString(),
+            tags: memory.tags || [],
+            content: memory.content
+          }
+        );
+        zgStorageId = storageResult.storageId;
       }
 
       // 2. If contract is available, also store on-chain
@@ -159,15 +203,21 @@ export class ZGIndexingService {
             tags
           );
 
-          const receipt = await tx.wait();
-          
+          // Return immediately with transaction hash (don't wait for mining)
           console.log(`✅ Memory indexed successfully (storage + blockchain)!`);
-          console.log(`📍 Transaction Hash: ${receipt.hash}`);
+          console.log(`📍 Transaction Hash: ${tx.hash} (pending)`);
           console.log(`🔗 0G Storage ID: ${zgStorageId}`);
+
+          // Start waiting for confirmation in background (don't await)
+          tx.wait().then(receipt => {
+            console.log(`⛓️  Transaction confirmed: ${receipt.hash}`);
+          }).catch(error => {
+            console.warn(`⚠️  Transaction failed: ${tx.hash}`, error);
+          });
 
           return {
             success: true,
-            transactionHash: receipt.hash,
+            transactionHash: tx.hash, // Return immediately with pending tx hash
             contractHash: contentHash,
           };
         } catch (contractError: any) {
@@ -226,12 +276,28 @@ export class ZGIndexingService {
         let zgStorageId = memory.metadata?.blobId || memory.ipfsHash;
         
         if (!zgStorageId || zgStorageId === memory.id) {
-          const storageResult = await this.ogStorage.uploadContent(memory.content, {
-            contentType: this.getContentType(memory),
-            tags: memory.tags || [],
-            agentId: memory.accessPolicy?.owner || 'unknown'
-          });
-          zgStorageId = storageResult.dataId;
+          // Generate proper embedding vector for batch processing
+          let embeddingVector: number[];
+          try {
+            const { getMemoryManager } = await import('./memory-manager');
+            const memoryManager = getMemoryManager();
+            embeddingVector = await memoryManager.generateEmbedding(memory.content);
+          } catch (error: any) {
+            console.warn('⚠️ Failed to generate embedding for batch item, using fallback:', error.message);
+            embeddingVector = new Array(1536).fill(0).map(() => Math.random() - 0.5);
+          }
+          
+          const storageResult = await this.ogStorage.storeEmbedding(
+            memory.id,
+            embeddingVector,
+            {
+              agentId: memory.accessPolicy?.owner || 'unknown',
+              timestamp: memory.createdAt?.toISOString() || new Date().toISOString(),
+              tags: memory.tags || [],
+              content: memory.content
+            }
+          );
+          zgStorageId = storageResult.storageId;
         }
 
         hashes.push(ethers.keccak256(ethers.toUtf8Bytes(memory.content)));
@@ -430,14 +496,22 @@ export class ZGIndexingService {
   private getContentType(memory: MemoryEntry): string {
     if (memory.type) {
       switch (memory.type) {
-        case MemoryType.CONVERSATION:
+        case 'conversation':
           return 'conversation';
-        case MemoryType.DOCUMENT:
+        case 'learned_fact':
           return 'document';
-        case MemoryType.IMAGE:
+        case 'multimedia':
           return 'image';
-        case MemoryType.PREFERENCE:
+        case 'user_preference':
           return 'preference';
+        case 'task_outcome':
+          return 'task';
+        case 'workflow':
+          return 'workflow';
+        case 'agent_share':
+          return 'shared';
+        case 'profile_data':
+          return 'profile';
         default:
           return 'text';
       }

@@ -290,9 +290,9 @@ export class OGStorageService {
           explorerUrl: `${this.config.explorerUrl}/tx/${txHash}`,
           transactionHash: txHash
       };
-    } catch (error) {
+    } catch (error: any) {
         console.error('❌ Failed to store embedding with real 0G SDK:', error);
-      throw new Error(`0G fallback storage failed: ${error?.message}`);
+      throw new Error(`0G fallback storage failed: ${error?.message || 'Unknown error'}`);
       }
     } else {
       throw new Error('Both Walrus and 0G storage services are unavailable');
@@ -356,9 +356,9 @@ export class OGStorageService {
         transactionHash: result.suiRef
       };
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Failed to store embedding on Walrus:', error);
-      throw new Error(`Walrus embedding storage failed: ${error?.message}`);
+      throw new Error(`Walrus embedding storage failed: ${error?.message || 'Unknown error'}`);
     }
   }
 
@@ -389,9 +389,9 @@ export class OGStorageService {
 
       console.log(`✅ Retrieved 0 embeddings (no storage available)`);
       return [];
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Failed to query embeddings from storage:', error);
-      throw new Error(`Embedding query failed: ${error?.message}`);
+      throw new Error(`Embedding query failed: ${error?.message || 'Unknown error'}`);
     }
   }
 
@@ -419,7 +419,7 @@ export class OGStorageService {
           contentHash: memory.metadata?.checksum || '',
           content: memory.content
         },
-        storageId: memory.metadata?.blobId || memory.ipfsHash,
+        storageId: memory.metadata?.blobId || memory.ipfsHash || memory.id,
         explorerUrl: memory.explorerUrl,
         transactionHash: memory.transactionHash
       }));
@@ -463,9 +463,9 @@ export class OGStorageService {
       
       console.log(`✅ 0G Compute inference completed successfully`);
       return result;
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Failed to compute inference on 0G:', error);
-      throw new Error(`0G Compute inference failed: ${error?.message}`);
+      throw new Error(`0G Compute inference failed: ${error?.message || 'Unknown error'}`);
     }
   }
 
@@ -523,9 +523,9 @@ export class OGStorageService {
 
       console.log(`✅ KV upload successful! TX: ${tx}`);
       return tx;
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Failed to upload to 0G-KV:', error);
-      throw new Error(`0G-KV upload failed: ${error?.message}`);
+      throw new Error(`0G-KV upload failed: ${error?.message || 'Unknown error'}`);
     }
   }
 
@@ -553,9 +553,9 @@ export class OGStorageService {
       
       console.log(`✅ KV download successful! Value length: ${value?.length || 0}`);
       return value || '';
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Failed to download from 0G-KV:', error);
-      throw new Error(`0G-KV download failed: ${error?.message}`);
+      throw new Error(`0G-KV download failed: ${error?.message || 'Unknown error'}`);
     }
   }
 
@@ -571,9 +571,9 @@ export class OGStorageService {
       
       console.log(`✅ Flow contract initialized using 0G SDK`);
       return flowContract;
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Failed to initialize flow contract:', error);
-      throw new Error(`Flow contract initialization failed: ${error?.message}`);
+      throw new Error(`Flow contract initialization failed: ${error?.message || 'Unknown error'}`);
     }
   }
 }

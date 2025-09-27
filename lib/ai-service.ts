@@ -5,6 +5,7 @@ export interface AIResponse {
   shouldStore: boolean;
   explorerUrl?: string;
   transactionHash?: string;
+  walrusUrl?: string;
 }
 
 export interface AIService {

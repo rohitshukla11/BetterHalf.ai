@@ -103,7 +103,8 @@ export class PersonalizedAgentService {
           content: response,
           shouldStore: true,
           explorerUrl: memoryResult.explorerUrl,
-          transactionHash: memoryResult.transactionHash
+          transactionHash: memoryResult.transactionHash,
+          walrusUrl: memoryResult.walrusUrl
         };
       } catch (learningError) {
         console.error('❌ LEARNING FAILED - Returning response without learning:', learningError);
@@ -647,7 +648,8 @@ Current date and time: ${new Date().toLocaleString()}`;
       console.log('✅ Learning interaction stored successfully');
       return {
         explorerUrl: memory.explorerUrl,
-        transactionHash: memory.transactionHash
+        transactionHash: memory.transactionHash,
+        walrusUrl: memory.walrusUrl
       };
     } catch (error: any) {
       console.error('❌ LEARNING INTERACTION ERROR:', error);

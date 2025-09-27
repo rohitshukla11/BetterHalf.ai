@@ -3,26 +3,36 @@ import "@nomicfoundation/hardhat-toolbox";
 
 const config: HardhatUserConfig = {
   solidity: {
-    version: "0.8.19",
+    version: "0.8.20",
     settings: {
       optimizer: {
         enabled: true,
         runs: 200,
       },
+      viaIR: true, // Enable via-IR to fix "Stack too deep" errors
     },
   },
   networks: {
     hardhat: {
       chainId: 1337,
     },
+    "0g-testnet": {
+      url: "https://evmrpc-testnet.0g.ai",
+      chainId: 16602,
+      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+      timeout: 60000,
+      httpHeaders: {
+        "User-Agent": "hardhat"
+      }
+    },
     galileo: {
-      url: "https://rpc.galileo.0g.ai",
-      chainId: 16600,
+      url: "https://evmrpc-testnet.0g.ai",
+      chainId: 16602,
       accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
     },
     testnet: {
-      url: "https://rpc.galileo.0g.ai",
-      chainId: 16600,
+      url: "https://evmrpc-testnet.0g.ai", 
+      chainId: 16602,
       accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
     },
     mainnet: {

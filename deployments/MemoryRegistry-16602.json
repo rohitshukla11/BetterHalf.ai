@@ -1,0 +1,12 @@
+{
+  "contractAddress": "0xe96fb286f36372effcf846f8a0d25773d63a3618",
+  "deployer": "0x5c5E0b0B04a0D1D10E2c4B9A3e5F3c2a31D4B8C9",
+  "network": {
+    "name": "0g-testnet",
+    "chainId": 16602
+  },
+  "deployedAt": "2025-09-27T15:30:00.000Z",
+  "contractVersion": "3.0.0-0g-enhanced",
+  "rpcUrl": "https://evmrpc-testnet.0g.ai",
+  "explorerUrl": "https://explorer-testnet.0g.ai"
+}

@@ -396,11 +396,41 @@ export class OGStorageService {
   }
 
   private async queryEmbeddingsFromWalrus(queryVector: number[], topK: number): Promise<OGEmbeddingResult[]> {
-    // For now, return empty results as we need to implement a memory index
-    // In a production system, you would maintain an index of stored embeddings
-    // with their blob IDs and metadata for retrieval
-    console.log(`✅ Retrieved 0 embeddings from Walrus (indexing not yet implemented)`);
-    return [];
+    try {
+      console.log(`📊 Searching Walrus memories with vector similarity (top-${topK})`);
+      
+      // Use the MemoryIndexer for vector similarity search
+      const { MemoryIndexer } = await import('./memory-indexer');
+      const similarMemories = MemoryIndexer.searchByVector(queryVector, topK);
+      
+      if (similarMemories.length === 0) {
+        console.log(`✅ Retrieved 0 embeddings from Walrus (no vectors in index)`);
+        return [];
+      }
+      
+      // Convert MemoryEntry to OGEmbeddingResult format
+      const results: OGEmbeddingResult[] = similarMemories.map(memory => ({
+        vector: queryVector, // We don't store the original vector, using query vector as placeholder
+        metadata: {
+          conversationId: memory.id,
+          agentId: memory.accessPolicy?.owner || 'unknown',
+          timestamp: memory.createdAt?.toISOString() || new Date().toISOString(),
+          tags: memory.tags || [],
+          contentHash: memory.metadata?.checksum || '',
+          content: memory.content
+        },
+        storageId: memory.metadata?.blobId || memory.ipfsHash,
+        explorerUrl: memory.explorerUrl,
+        transactionHash: memory.transactionHash
+      }));
+      
+      console.log(`✅ Retrieved ${results.length} embeddings from Walrus vector index`);
+      return results;
+      
+    } catch (error) {
+      console.warn('⚠️ Walrus vector search failed:', error);
+      return [];
+    }
   }
 
   private async queryEmbeddingsFrom0G(queryVector: number[], topK: number): Promise<OGEmbeddingResult[]> {

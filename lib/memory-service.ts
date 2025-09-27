@@ -5,6 +5,7 @@ import { getInferenceClient, InferenceClient } from './inference-client';
 import { getEncryptionService } from './encryption';
 import { getKeyManagementService } from './key-management';
 import { v4 as uuidv4 } from 'uuid';
+import { MemoryIndexer } from './memory-indexer';
 
 export class MemoryService {
   private ogStorage: OGStorageService;
@@ -54,6 +55,79 @@ export class MemoryService {
     }
   }
 
+  private async loadMemoriesFromWalrus(): Promise<void> {
+    try {
+      console.log('🦭 Loading memories from Walrus storage...');
+      
+      // Use the new MemoryIndexer system
+      const memoryIndex = MemoryIndexer.getMetadataIndex();
+      
+      if (memoryIndex.length === 0) {
+        console.log('📚 No memory index found, memories might not be loaded yet');
+        return;
+      }
+
+      console.log(`📚 Found ${memoryIndex.length} memories in index`);
+      
+      // Load memories from the index
+      this.memories = memoryIndex;
+      
+      // Get index statistics (now async)
+      try {
+        const stats = await MemoryIndexer.getIndexStats();
+        console.log(`✅ Loaded ${this.memories.length} memories from enhanced index`);
+        console.log(`📊 Local index stats: ${stats.local.metadataCount} metadata, ${stats.local.vectorCount} vectors, ${Math.round(stats.local.totalSize/1024)}KB`);
+        if (stats.onChain) {
+          console.log(`⛓️  On-chain stats: ${stats.onChain.totalMemories} total, ${stats.onChain.verifiedMemories} verified`);
+        }
+      } catch (error) {
+        console.warn('⚠️ Failed to get index stats:', error);
+      }
+      
+    } catch (error) {
+      console.warn('⚠️ Failed to load memories from Walrus:', error);
+    }
+  }
+
+  private getMemoryIndex(): MemoryEntry[] {
+    try {
+      if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+        return [];
+      }
+      
+      const index = localStorage.getItem('walrus_memory_index');
+      if (index) {
+        return JSON.parse(index);
+      }
+      return [];
+    } catch (error) {
+      console.warn('⚠️ Failed to load memory index:', error);
+      return [];
+    }
+  }
+
+  private updateMemoryIndex(memory: MemoryEntry): void {
+    try {
+      if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+        return;
+      }
+      
+      const currentIndex = this.getMemoryIndex();
+      const existingIndex = currentIndex.findIndex(m => m.id === memory.id);
+      
+      if (existingIndex >= 0) {
+        currentIndex[existingIndex] = memory;
+      } else {
+        currentIndex.unshift(memory);
+      }
+      
+      localStorage.setItem('walrus_memory_index', JSON.stringify(currentIndex));
+      console.log(`📚 Updated memory index with ${currentIndex.length} memories`);
+    } catch (error) {
+      console.warn('⚠️ Failed to update memory index:', error);
+    }
+  }
+
   private saveMemoriesToStorage(): void {
     try {
       // Check if we're in a browser environment
@@ -77,6 +151,10 @@ export class MemoryService {
       await this.ogStorage.initialize();
       await this.memoryManager.initialize();
       await this.inferenceClient.initialize();
+      
+      // Load memories from Walrus storage
+      await this.loadMemoriesFromWalrus();
+      
       console.log('✅ Memory service initialized successfully');
     } catch (error) {
       console.error('❌ Memory service initialization failed:', error);
@@ -168,8 +246,12 @@ export class MemoryService {
       this.memories.push(memory);
       this.saveMemoriesToStorage();
 
-      // Store embedding in 0G Storage
+      // Store embedding in 0G Storage and get the vector for indexing
+      let embeddingVector: number[] | undefined;
       try {
+        // Generate embedding vector first
+        embeddingVector = await this.memoryManager.generateEmbedding(memoryData.content);
+        
         const embeddingResult = await this.memoryManager.storeEmbedding(memoryId, memoryData.content, {
           agentId: 'local-user',
           tags: memoryData.tags || []
@@ -187,6 +269,10 @@ export class MemoryService {
       } catch (ogError) {
         console.warn('⚠️ Failed to upload to 0G Storage, keeping local copy:', ogError);
       }
+
+      // Update the memory indices using the new indexer (with vector for similarity search)
+      // This is now async and will handle both local and on-chain indexing
+      await MemoryIndexer.addToIndex(memory, embeddingVector);
 
       return memory;
     } catch (error: any) {

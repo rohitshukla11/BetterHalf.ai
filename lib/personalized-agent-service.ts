@@ -646,10 +646,27 @@ Current date and time: ${new Date().toLocaleString()}`;
       });
 
       console.log('✅ Learning interaction stored successfully');
-      return {
-        explorerUrl: memory.explorerUrl,
+      
+      // Construct explorer URLs immediately if we have the necessary data
+      const explorerUrl = memory.transactionHash 
+        ? `${process.env.NEXT_PUBLIC_0G_EXPLORER_URL || 'https://chainscan-galileo.0g.ai'}/transaction/${memory.transactionHash}`
+        : memory.explorerUrl;
+        
+      const walrusUrl = memory.ipfsHash && memory.ipfsHash.startsWith('0x')
+        ? `https://walruscan.com/testnet/blob/${memory.ipfsHash}`
+        : memory.walrusUrl;
+      
+      console.log('📊 Memory URLs:', {
+        explorerUrl,
         transactionHash: memory.transactionHash,
-        walrusUrl: memory.walrusUrl
+        walrusUrl,
+        ipfsHash: memory.ipfsHash
+      });
+      
+      return {
+        explorerUrl,
+        transactionHash: memory.transactionHash,
+        walrusUrl
       };
     } catch (error: any) {
       console.error('❌ LEARNING INTERACTION ERROR:', error);

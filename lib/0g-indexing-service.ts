@@ -180,8 +180,13 @@ export class ZGIndexingService {
           const contentHash = ethers.keccak256(ethers.toUtf8Bytes(memory.content));
 
           // Prepare contract parameters
+          // Generate a meaningful title from content
+          const title = memory.metadata?.title || 
+                       memory.content.split('\n')[0].substring(0, 50).trim() || 
+                       `${memory.type} - ${memory.category}`;
+          
           const metadata = JSON.stringify({
-            title: memory.title || 'Untitled Memory',
+            title: title,
             category: memory.category,
             agentId: memory.accessPolicy?.owner,
             createdAt: memory.createdAt?.toISOString(),
@@ -301,8 +306,14 @@ export class ZGIndexingService {
         }
 
         hashes.push(ethers.keccak256(ethers.toUtf8Bytes(memory.content)));
+        
+        // Generate a meaningful title from content
+        const title = memory.metadata?.title || 
+                     memory.content.split('\n')[0].substring(0, 50).trim() || 
+                     `${memory.type} - ${memory.category}`;
+        
         metadatas.push(JSON.stringify({
-          title: memory.title || 'Untitled Memory',
+          title: title,
           category: memory.category,
           agentId: memory.accessPolicy?.owner,
           createdAt: memory.createdAt?.toISOString(),

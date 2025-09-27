@@ -13,6 +13,7 @@ interface ChatMessage {
   insights?: PersonalInsights
   explorerUrl?: string
   transactionHash?: string
+  walrusUrl?: string
 }
 
 interface PersonalInsights {
@@ -257,17 +258,34 @@ export function PersonalizedChatInterface({
                   >
                     {formatTime(message.timestamp)}
                   </p>
-                  {/* 0G Explorer Link */}
-                  {message.role === 'assistant' && message.explorerUrl && (
-                    <a
-                      href={message.explorerUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-purple-600 hover:text-purple-800 underline flex items-center space-x-1"
-                      title={`View on Blockchain Explorer${message.transactionHash ? ` (${typeof message.transactionHash === 'string' ? message.transactionHash.slice(0, 8) : String(message.transactionHash).slice(0, 8)}...)` : ''}`}
-                    >
-                      <span>🔗 Blockchain Explorer</span>
-                    </a>
+                  {/* Explorer Links */}
+                  {message.role === 'assistant' && (message.explorerUrl || message.walrusUrl) && (
+                    <div className="flex items-center space-x-3">
+                      {/* 0G Blockchain Explorer Link */}
+                      {message.explorerUrl && (
+                        <a
+                          href={message.explorerUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-purple-600 hover:text-purple-800 underline flex items-center space-x-1"
+                          title={`View on 0G Blockchain Explorer${message.transactionHash ? ` (${typeof message.transactionHash === 'string' ? message.transactionHash.slice(0, 8) : String(message.transactionHash).slice(0, 8)}...)` : ''}`}
+                        >
+                          <span>⛓️ 0G Explorer</span>
+                        </a>
+                      )}
+                      {/* Walrus Storage Explorer Link */}
+                      {message.walrusUrl && (
+                        <a
+                          href={message.walrusUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-blue-600 hover:text-blue-800 underline flex items-center space-x-1"
+                          title="View on Walrus Storage Explorer"
+                        >
+                          <span>🦭 Walrus Explorer</span>
+                        </a>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>

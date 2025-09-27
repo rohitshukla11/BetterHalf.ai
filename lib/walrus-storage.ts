@@ -153,7 +153,7 @@ export class WalrusStorageService {
         throw new Error('Unexpected response format from Walrus');
       }
 
-      const blobId = blobInfo.blobId;
+      const blobId = blobInfo.blobObject?.blobId || blobInfo.blobId;
       const suiRef = blobInfo.blobObject?.id;
       const endEpoch = blobInfo.storage?.endEpoch || blobInfo.endEpoch;
 

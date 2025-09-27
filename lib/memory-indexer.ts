@@ -110,7 +110,7 @@ export class MemoryIndexer {
         
         // Update memory object with blockchain explorer URL (pending transaction)
         if (result.transactionHash) {
-          memory.explorerUrl = `${process.env.NEXT_PUBLIC_0G_EXPLORER_URL || 'https://chainscan-testnet.0g.ai'}/tx/${result.transactionHash}`;
+          memory.explorerUrl = `${process.env.NEXT_PUBLIC_0G_EXPLORER_URL || 'https://chainscan-galileo.0g.ai'}/transaction/${result.transactionHash}`;
           memory.transactionHash = result.transactionHash;
           console.log(`🔗 0G Explorer URL: ${memory.explorerUrl}`);
         }
@@ -557,6 +557,43 @@ export class MemoryIndexer {
     }
 
     return Array.from(localTags).sort();
+  }
+
+  /**
+   * Remove a memory from all indices
+   */
+  static async removeFromIndex(memoryId: string): Promise<void> {
+    try {
+      console.log(`🗑️ Removing memory from indices: ${memoryId}`);
+      
+      // Remove from metadata index
+      const metadataIndex = this.getMetadataIndex();
+      const updatedMetadata = metadataIndex.filter(entry => entry.id !== memoryId);
+      if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+        localStorage.setItem(this.METADATA_INDEX_KEY, JSON.stringify(updatedMetadata));
+      }
+      
+      // Remove from vector index
+      const vectorIndex = this.getVectorIndex();
+      const updatedVectors = vectorIndex.filter(entry => entry.id !== memoryId);
+      if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+        localStorage.setItem(this.VECTOR_INDEX_KEY, JSON.stringify(updatedVectors));
+      }
+      
+      // Remove from index config
+      const indexConfig = this.getIndexConfig();
+      if (indexConfig[memoryId]) {
+        delete indexConfig[memoryId];
+        if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+          localStorage.setItem(this.INDEX_CONFIG_KEY, JSON.stringify(indexConfig));
+        }
+      }
+      
+      console.log(`✅ Memory removed from all local indices: ${memoryId}`);
+    } catch (error) {
+      console.error('❌ Failed to remove memory from indices:', error);
+      throw error;
+    }
   }
 }
 

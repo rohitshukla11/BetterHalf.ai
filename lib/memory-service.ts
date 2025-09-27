@@ -177,6 +177,15 @@ export class MemoryService {
           // Apply query filters if needed
           let filteredMemories = contractResult.memories;
           
+          // Filter out deleted memories
+          const deletedMemories = this.getDeletedMemories();
+          if (deletedMemories.length > 0) {
+            filteredMemories = filteredMemories.filter((memory: MemoryEntry) => 
+              !deletedMemories.includes(memory.id)
+            );
+            console.log(`🗑️ Filtered out ${contractResult.memories.length - filteredMemories.length} deleted memories`);
+          }
+          
           if (query.query) {
             filteredMemories = filteredMemories.filter((memory: MemoryEntry) =>
               memory.content.toLowerCase().includes(query.query.toLowerCase()) ||
@@ -328,6 +337,7 @@ export class MemoryService {
         // Update memory with 0G storage information
         if (embeddingResult.explorerUrl) {
           memory.walrusUrl = embeddingResult.explorerUrl; // This is now the Walrus explorer URL
+          console.log(`🔗 Walrus URL set: ${memory.walrusUrl}`);
         }
         if (embeddingResult.transactionHash) {
           memory.transactionHash = embeddingResult.transactionHash;
@@ -445,21 +455,99 @@ export class MemoryService {
 
   async deleteMemory(memoryId: string): Promise<boolean> {
     try {
-      const memoryIndex = this.memories.findIndex(m => m.id === memoryId);
-      if (memoryIndex === -1) {
-        console.log(`Memory not found: ${memoryId}`);
-        return false;
+      console.log(`🗑️ Marking memory as deleted: ${memoryId}`);
+      console.log(`🔍 Environment check: window=${typeof window}, localStorage=${typeof localStorage}`);
+      
+      // Add to deleted memories list
+      this.addToDeletedMemories(memoryId);
+      
+      // Remove from local memory indexer
+      try {
+        await MemoryIndexer.removeFromIndex(memoryId);
+        console.log('✅ Memory removed from local index');
+      } catch (indexError) {
+        console.warn('⚠️ Failed to remove from local index:', indexError);
       }
 
-      // Remove from local storage
-      this.memories.splice(memoryIndex, 1);
-      this.saveMemoriesToStorage();
+      // Remove from local memory cache
+      const memoryIndex = this.memories.findIndex(m => m.id === memoryId);
+      if (memoryIndex !== -1) {
+        const memory = this.memories[memoryIndex];
+        this.memories.splice(memoryIndex, 1);
+        this.saveMemoriesToStorage();
+        console.log(`ℹ️ Note: Data on blockchain (${memory.transactionHash}) and Walrus storage (${memory.ipfsHash}) remains immutable`);
+      }
 
-      console.log(`Memory deleted locally: ${memoryId}`);
+      console.log(`✅ Memory marked as deleted: ${memoryId}`);
       return true;
     } catch (error) {
       console.error('❌ Memory deletion failed:', error);
       throw error;
+    }
+  }
+
+  private addToDeletedMemories(memoryId: string): void {
+    try {
+      if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+        // Client-side storage
+        const deletedKey = 'deleted-memories';
+        const existing = localStorage.getItem(deletedKey);
+        const deletedMemories = existing ? JSON.parse(existing) : [];
+        
+        if (!deletedMemories.includes(memoryId)) {
+          deletedMemories.push(memoryId);
+          localStorage.setItem(deletedKey, JSON.stringify(deletedMemories));
+        }
+      } else {
+        // Server-side storage
+        console.log('📁 Using server-side storage for deleted memories');
+        const fs = require('fs');
+        const path = require('path');
+        const deletedFilePath = path.join(process.cwd(), '.deleted-memories.json');
+        console.log(`📁 Deleted memories file path: ${deletedFilePath}`);
+        
+        let deletedMemories: string[] = [];
+        if (fs.existsSync(deletedFilePath)) {
+          const fileContent = fs.readFileSync(deletedFilePath, 'utf-8');
+          deletedMemories = JSON.parse(fileContent);
+          console.log(`📁 Loaded ${deletedMemories.length} existing deleted memories`);
+        }
+        
+        if (!deletedMemories.includes(memoryId)) {
+          deletedMemories.push(memoryId);
+          fs.writeFileSync(deletedFilePath, JSON.stringify(deletedMemories, null, 2));
+          console.log(`📁 Added ${memoryId} to deleted memories file`);
+        } else {
+          console.log(`📁 Memory ${memoryId} already in deleted list`);
+        }
+      }
+    } catch (error) {
+      console.warn('⚠️ Failed to update deleted memories list:', error);
+    }
+  }
+
+  private getDeletedMemories(): string[] {
+    try {
+      if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+        // Client-side storage
+        const deletedKey = 'deleted-memories';
+        const existing = localStorage.getItem(deletedKey);
+        return existing ? JSON.parse(existing) : [];
+      } else {
+        // Server-side storage
+        const fs = require('fs');
+        const path = require('path');
+        const deletedFilePath = path.join(process.cwd(), '.deleted-memories.json');
+        
+        if (fs.existsSync(deletedFilePath)) {
+          const fileContent = fs.readFileSync(deletedFilePath, 'utf-8');
+          return JSON.parse(fileContent);
+        }
+        return [];
+      }
+    } catch (error) {
+      console.warn('⚠️ Failed to load deleted memories list:', error);
+      return [];
     }
   }
 

@@ -1,0 +1,20 @@
+{
+  "env": {
+    "NEXT_PUBLIC_GOOGLE_CLIENT_ID": "@google_client_id",
+    "NEXT_PUBLIC_GOOGLE_CLIENT_SECRET": "@google_client_secret",
+    "NEXT_PUBLIC_GOOGLE_REDIRECT_URI": "@google_redirect_uri",
+    "NEXT_PUBLIC_APP_URL": "@app_url",
+    "NEXT_PUBLIC_DEFAULT_ENCRYPTION_PASSWORD": "@encryption_password",
+    "OPENAI_API_KEY": "@openai_api_key",
+    "NEXT_PUBLIC_0G_RPC_URL": "@0g_rpc_url",
+    "NEXT_PUBLIC_0G_CHAIN_ID": "@0g_chain_id",
+    "NEXT_PUBLIC_0G_PRIVATE_KEY": "@0g_private_key",
+    "NEXT_PUBLIC_0G_STORAGE_ENDPOINT": "@0g_storage_endpoint",
+    "NEXT_PUBLIC_0G_COMPUTE_ENDPOINT": "@0g_compute_endpoint"
+  },
+  "functions": {
+    "app/api/**/*.ts": {
+      "maxDuration": 30
+    }
+  }
+}

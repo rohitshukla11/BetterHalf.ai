@@ -27,7 +27,7 @@ interface MemoryManagerConfig {
 
 export class MemoryManager {
   private ogStorage: OGStorageService;
-  private openai: OpenAI;
+  private openai: OpenAI | null = null;
   private config: MemoryManagerConfig;
 
   constructor(config: Partial<MemoryManagerConfig> = {}) {
@@ -40,10 +40,19 @@ export class MemoryManager {
       similarityThreshold: 0.7,
       ...config
     };
+  }
 
-    this.openai = new OpenAI({
-      apiKey: this.config.openaiApiKey,
-    });
+  private getOpenAI(): OpenAI {
+    if (!this.openai) {
+      // Check if we're in a browser environment
+      const isBrowser = typeof window !== 'undefined';
+      
+      this.openai = new OpenAI({
+        apiKey: this.config.openaiApiKey,
+        ...(isBrowser && { dangerouslyAllowBrowser: true })
+      });
+    }
+    return this.openai;
   }
 
   async initialize(): Promise<void> {
@@ -56,7 +65,7 @@ export class MemoryManager {
     try {
       console.log(`🔄 Generating embedding for text: ${text.substring(0, 50)}...`);
 
-      const response = await this.openai.embeddings.create({
+      const response = await this.getOpenAI().embeddings.create({
         model: this.config.embeddingModel,
         input: text,
       });

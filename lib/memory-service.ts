@@ -36,6 +36,13 @@ export class MemoryService {
 
   private loadMemoriesFromStorage(): void {
     try {
+      // Check if we're in a browser environment
+      if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+        console.log('📚 Not in browser environment, skipping localStorage load');
+        this.memories = [];
+        return;
+      }
+      
       const stored = localStorage.getItem('memories');
       if (stored) {
         this.memories = JSON.parse(stored);
@@ -49,6 +56,12 @@ export class MemoryService {
 
   private saveMemoriesToStorage(): void {
     try {
+      // Check if we're in a browser environment
+      if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+        console.log('💾 Not in browser environment, skipping localStorage save');
+        return;
+      }
+      
       localStorage.setItem('memories', JSON.stringify(this.memories));
       console.log(`💾 Saved ${this.memories.length} memories to local storage`);
     } catch (error) {

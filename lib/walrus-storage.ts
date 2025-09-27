@@ -59,7 +59,7 @@ export class WalrusStorageService {
       console.log('✅ Walrus storage service initialized successfully');
     } catch (error) {
       console.error('❌ Failed to initialize Walrus storage service:', error);
-      throw new Error(`Walrus initialization failed: ${error?.message}`);
+      throw new Error(`Walrus initialization failed: ${(error as any)?.message || 'Unknown error'}`);
     }
   }
 

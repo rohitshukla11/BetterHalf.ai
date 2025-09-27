@@ -621,24 +621,27 @@ Current date and time: ${new Date().toLocaleString()}`;
     return data.choices[0]?.message?.content || 'I apologize, but I could not generate a response.';
   }
 
-  private async learnFromInteraction(userInput: string, aiResponse: string): Promise<{ explorerUrl?: string; transactionHash?: string }> {
+  private async learnFromInteraction(userInput: string, aiResponse: string): Promise<{ explorerUrl?: string; transactionHash?: string; walrusUrl?: string }> {
     try {
       // Store interaction patterns and preferences (limit content size more aggressively)
       const truncatedInput = userInput.length > 50 ? userInput.substring(0, 50) + '...' : userInput;
       const truncatedResponse = aiResponse.length > 75 ? aiResponse.substring(0, 75) + '...' : aiResponse;
       
+      // Analyze the interaction to determine appropriate memory attributes
+      const memoryAttributes = this.analyzeInteractionForMemory(userInput, aiResponse);
+      
       const memory = await this.memoryService.createMemory({
-        content: `User pattern: ${truncatedInput} -> ${truncatedResponse}`,
-        type: 'learned_fact',
-        category: 'Personal Preferences',
-        tags: ['personalized-agent', 'learning', 'preferences'],
+        content: memoryAttributes.content,
+        type: memoryAttributes.type,
+        category: memoryAttributes.category,
+        tags: memoryAttributes.tags,
         encrypted: true,
         accessPolicy: {
           owner: 'local-user',
           permissions: []
         },
         metadata: {
-          size: truncatedInput.length + truncatedResponse.length,
+          size: userInput.length + aiResponse.length,
           checksum: '',
           version: 1,
           relatedMemories: []
@@ -684,23 +687,114 @@ Current date and time: ${new Date().toLocaleString()}`;
     }
   }
 
+  /**
+   * Analyze user interaction to determine appropriate memory attributes
+   */
+  private analyzeInteractionForMemory(userInput: string, aiResponse: string): {
+    title: string;
+    content: string;
+    type: 'conversation' | 'learned_fact' | 'profile_data' | 'task_outcome' | 'user_preference';
+    category: string;
+    tags: string[];
+  } {
+    const input = userInput.toLowerCase();
+    const response = aiResponse.toLowerCase();
+    
+    // Determine memory type based on content analysis
+    let type: 'conversation' | 'learned_fact' | 'profile_data' | 'task_outcome' | 'user_preference' = 'conversation';
+    let category = 'General Chat';
+    let tags = ['personalized-agent'];
+    let title = '';
+    
+    // Health & Wellness patterns
+    if (input.includes('workout') || input.includes('exercise') || input.includes('fitness') || input.includes('gym')) {
+      type = 'user_preference';
+      category = 'Health & Fitness';
+      tags = ['fitness', 'workout', 'health', 'preferences'];
+      title = `Fitness Query: ${userInput.substring(0, 40)}${userInput.length > 40 ? '...' : ''}`;
+    }
+    // Food & Nutrition patterns
+    else if (input.includes('eat') || input.includes('food') || input.includes('meal') || input.includes('cook') || input.includes('recipe') || input.includes('lunch') || input.includes('dinner') || input.includes('breakfast')) {
+      type = 'user_preference';
+      category = 'Food & Nutrition';
+      tags = ['food', 'nutrition', 'meals', 'preferences'];
+      title = `Food Preference: ${userInput.substring(0, 40)}${userInput.length > 40 ? '...' : ''}`;
+    }
+    // Schedule & Time Management patterns
+    else if (input.includes('schedule') || input.includes('time') || input.includes('plan') || input.includes('day') || input.includes('calendar') || input.includes('meeting')) {
+      type = 'task_outcome';
+      category = 'Schedule & Planning';
+      tags = ['schedule', 'planning', 'time-management', 'tasks'];
+      title = `Schedule Query: ${userInput.substring(0, 40)}${userInput.length > 40 ? '...' : ''}`;
+    }
+    // Personal preferences and lifestyle
+    else if (input.includes('prefer') || input.includes('like') || input.includes('favorite') || input.includes('enjoy') || input.includes('hobby')) {
+      type = 'profile_data';
+      category = 'Personal Profile';
+      tags = ['profile', 'preferences', 'lifestyle'];
+      title = `Personal Preference: ${userInput.substring(0, 40)}${userInput.length > 40 ? '...' : ''}`;
+    }
+    // Learning and facts
+    else if (input.includes('how') || input.includes('what') || input.includes('why') || input.includes('explain') || input.includes('tell me')) {
+      type = 'learned_fact';
+      category = 'Knowledge & Learning';
+      tags = ['learning', 'knowledge', 'facts'];
+      title = `Knowledge Query: ${userInput.substring(0, 40)}${userInput.length > 40 ? '...' : ''}`;
+    }
+    // Goal setting and productivity
+    else if (input.includes('goal') || input.includes('achieve') || input.includes('productive') || input.includes('improve') || input.includes('better')) {
+      type = 'task_outcome';
+      category = 'Goals & Productivity';
+      tags = ['goals', 'productivity', 'improvement', 'tasks'];
+      title = `Goal Discussion: ${userInput.substring(0, 40)}${userInput.length > 40 ? '...' : ''}`;
+    }
+    // Default conversation
+    else {
+      type = 'conversation';
+      category = 'General Chat';
+      tags = ['conversation', 'chat'];
+      title = `Chat: ${userInput.substring(0, 40)}${userInput.length > 40 ? '...' : ''}`;
+    }
+    
+    // Create structured content instead of "User pattern:"
+    const content = JSON.stringify({
+      userQuery: userInput,
+      aiResponse: aiResponse.substring(0, 200) + (aiResponse.length > 200 ? '...' : ''),
+      timestamp: new Date().toISOString(),
+      context: category,
+      interaction_type: type
+    }, null, 2);
+    
+    return {
+      title,
+      content,
+      type,
+      category,
+      tags
+    };
+  }
+
   // User profile management
   private async loadUserProfile(): Promise<void> {
     try {
-      // Search specifically for profile_data type memories
+      // Search for profile memories using multiple criteria
       const profileMemories = await this.memoryService.searchMemories({
-        query: '', // Empty query to get all
-        type: 'profile_data',
-        category: 'Personal Profile',
+        query: 'profile', // Search for profile-related content
         limit: 10
       });
 
-      console.log(`🔍 Found ${profileMemories.memories.length} existing profile memories`);
+      // Filter for actual profile memories (either type profile_data or has profile/preferences tags)
+      const actualProfileMemories = profileMemories.memories.filter(memory => 
+        memory.type === 'profile_data' || 
+        memory.tags?.some(tag => tag === 'profile' || tag === 'preferences')
+      );
 
-      if (profileMemories.memories.length > 0) {
+      console.log(`🔍 Found ${actualProfileMemories.length} existing profile memories (${profileMemories.memories.length} total searched)`);
+
+      if (actualProfileMemories.length > 0) {
         // Use existing profile - reconstruct from memories
         console.log('✅ Loading existing user profile from memory');
-        this.userProfile = this.reconstructProfileFromMemories(profileMemories.memories);
+        this.userProfile = this.reconstructProfileFromMemories(actualProfileMemories);
       } else {
         // Only create default profile if none exists
         console.log('📝 No existing profile found, creating default profile');
@@ -717,12 +811,32 @@ Current date and time: ${new Date().toLocaleString()}`;
     if (!this.userProfile) return;
 
     try {
+      console.log('💾 Checking if profile already exists before saving...');
+      
+      // Double-check that no profile exists to prevent duplicates
+      const existingCheck = await this.memoryService.searchMemories({
+        query: 'profile preferences goals',
+        limit: 5
+      });
+      
+      const hasExistingProfile = existingCheck.memories.some(memory => 
+        memory.type === 'profile_data' || 
+        (memory.tags?.includes('profile') && memory.tags?.includes('preferences'))
+      );
+      
+      if (hasExistingProfile) {
+        console.log('⚠️  Profile already exists, skipping save to prevent duplicates');
+        return;
+      }
+
       // Check if key management is initialized before creating encrypted profile
       const keyManagement = this.memoryService['keyManagement'];
       if (!keyManagement.isInitialized()) {
         console.log('🔐 Key management not initialized - skipping profile creation for now');
         return;
       }
+
+      console.log('💾 Saving new user profile to memory...');
 
       await this.memoryService.createMemory({
         content: JSON.stringify(this.userProfile),
@@ -741,6 +855,8 @@ Current date and time: ${new Date().toLocaleString()}`;
           relatedMemories: []
         }
       });
+
+      console.log('✅ User profile saved to memory');
     } catch (error) {
       console.error('Failed to save user profile:', error);
     }

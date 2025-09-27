@@ -275,32 +275,6 @@ export class MemoryIndexer {
     return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
   }
   
-  /**
-   * Remove memory from indices
-   */
-  static removeFromIndex(memoryId: string): void {
-    try {
-      // Remove from metadata index
-      const metadataIndex = this.getMetadataIndex();
-      const filteredMetadata = metadataIndex.filter(m => m.id !== memoryId);
-      
-      if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-        localStorage.setItem(this.MEMORY_INDEX_KEY, JSON.stringify(filteredMetadata));
-      }
-      
-      // Remove from vector index
-      const vectorIndex = this.getVectorIndex();
-      const filteredVectors = vectorIndex.filter(v => v.id !== memoryId);
-      
-      if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-        localStorage.setItem(this.VECTOR_INDEX_KEY, JSON.stringify(filteredVectors));
-      }
-      
-      console.log(`📚 Removed memory from indices: ${memoryId.slice(0, 8)}...`);
-    } catch (error) {
-      console.warn('⚠️ Failed to remove from index:', error);
-    }
-  }
   
   /**
    * Update index configuration for a memory entry
@@ -570,7 +544,7 @@ export class MemoryIndexer {
       const metadataIndex = this.getMetadataIndex();
       const updatedMetadata = metadataIndex.filter(entry => entry.id !== memoryId);
       if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-        localStorage.setItem(this.METADATA_INDEX_KEY, JSON.stringify(updatedMetadata));
+        localStorage.setItem(this.MEMORY_INDEX_KEY, JSON.stringify(updatedMetadata));
       }
       
       // Remove from vector index

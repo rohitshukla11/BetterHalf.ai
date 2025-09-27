@@ -180,10 +180,9 @@ export class ZGIndexingService {
           const contentHash = ethers.keccak256(ethers.toUtf8Bytes(memory.content));
 
           // Prepare contract parameters
-          // Generate a meaningful title from content
+          // Use title from metadata or generate a meaningful one from content
           const title = memory.metadata?.title || 
-                       memory.content.split('\n')[0].substring(0, 50).trim() || 
-                       `${memory.type} - ${memory.category}`;
+                       this.generateTitleFromContent(memory.content, memory.type, memory.category);
           
           const metadata = JSON.stringify({
             title: title,
@@ -542,6 +541,29 @@ export class ZGIndexingService {
    */
   isBlockchainAvailable(): boolean {
     return this.contract !== null && this.provider !== null;
+  }
+
+  /**
+   * Generate a meaningful title from content
+   */
+  private generateTitleFromContent(content: string, type: string, category: string): string {
+    try {
+      // Try to parse JSON content first
+      const parsedContent = JSON.parse(content);
+      if (parsedContent.userQuery) {
+        const query = parsedContent.userQuery.substring(0, 40);
+        return `${query}${parsedContent.userQuery.length > 40 ? '...' : ''}`;
+      }
+    } catch {
+      // If not JSON, use the first line of content
+      const firstLine = content.split('\n')[0].trim();
+      if (firstLine.length > 0) {
+        return firstLine.substring(0, 50) + (firstLine.length > 50 ? '...' : '');
+      }
+    }
+    
+    // Fallback to type and category
+    return `${type} - ${category}`;
   }
 }
 

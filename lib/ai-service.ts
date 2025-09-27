@@ -3,6 +3,8 @@ import { ChatMessage } from '@/types/chat';
 export interface AIResponse {
   content: string;
   shouldStore: boolean;
+  explorerUrl?: string;
+  transactionHash?: string;
 }
 
 export interface AIService {

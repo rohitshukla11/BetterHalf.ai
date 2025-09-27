@@ -200,7 +200,9 @@ export default function Home() {
         id: (Date.now() + 1).toString(),
         content: data.content,
         role: 'assistant',
-        timestamp: new Date()
+        timestamp: new Date(),
+        explorerUrl: data.explorerUrl,
+        transactionHash: data.transactionHash
       }
 
       const updatedMessages = [...personalizedMessages, userMessage, assistantMessage]

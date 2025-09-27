@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getPersonalizedAgent } from '@/lib/personalized-agent-service';
 import { ChatMessage } from '@/types/chat';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -40,6 +43,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       content: response.content,
       shouldStore: response.shouldStore,
+      explorerUrl: response.explorerUrl,
+      transactionHash: response.transactionHash,
       insights
     });
 

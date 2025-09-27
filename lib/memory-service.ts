@@ -170,10 +170,18 @@ export class MemoryService {
 
       // Store embedding in 0G Storage
       try {
-        await this.memoryManager.storeEmbedding(memoryId, memoryData.content, {
+        const embeddingResult = await this.memoryManager.storeEmbedding(memoryId, memoryData.content, {
           agentId: 'local-user',
           tags: memoryData.tags || []
         });
+
+        // Update memory with 0G storage information
+        if (embeddingResult.explorerUrl) {
+          memory.explorerUrl = embeddingResult.explorerUrl;
+        }
+        if (embeddingResult.transactionHash) {
+          memory.transactionHash = embeddingResult.transactionHash;
+        }
 
         console.log(`✅ Memory stored locally and embedding uploaded to 0G Storage: ${memoryId}`);
       } catch (ogError) {

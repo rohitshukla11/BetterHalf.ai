@@ -98,10 +98,12 @@ export class PersonalizedAgentService {
       
       // Learn from interaction
       try {
-        await this.learnFromInteraction(userInput, response);
+        const memoryResult = await this.learnFromInteraction(userInput, response);
         return {
           content: response,
-          shouldStore: true
+          shouldStore: true,
+          explorerUrl: memoryResult.explorerUrl,
+          transactionHash: memoryResult.transactionHash
         };
       } catch (learningError) {
         console.error('❌ LEARNING FAILED - Returning response without learning:', learningError);
@@ -618,13 +620,13 @@ Current date and time: ${new Date().toLocaleString()}`;
     return data.choices[0]?.message?.content || 'I apologize, but I could not generate a response.';
   }
 
-  private async learnFromInteraction(userInput: string, aiResponse: string): Promise<void> {
+  private async learnFromInteraction(userInput: string, aiResponse: string): Promise<{ explorerUrl?: string; transactionHash?: string }> {
     try {
       // Store interaction patterns and preferences (limit content size more aggressively)
       const truncatedInput = userInput.length > 50 ? userInput.substring(0, 50) + '...' : userInput;
       const truncatedResponse = aiResponse.length > 75 ? aiResponse.substring(0, 75) + '...' : aiResponse;
       
-      await this.memoryService.createMemory({
+      const memory = await this.memoryService.createMemory({
         content: `User pattern: ${truncatedInput} -> ${truncatedResponse}`,
         type: 'learned_fact',
         category: 'Personal Preferences',
@@ -643,6 +645,10 @@ Current date and time: ${new Date().toLocaleString()}`;
       });
 
       console.log('✅ Learning interaction stored successfully');
+      return {
+        explorerUrl: memory.explorerUrl,
+        transactionHash: memory.transactionHash
+      };
     } catch (error: any) {
       console.error('❌ LEARNING INTERACTION ERROR:', error);
       
@@ -655,6 +661,7 @@ Current date and time: ${new Date().toLocaleString()}`;
       
       // Don't throw error - just log it to avoid breaking the chat flow
       console.warn('⚠️ Learning failed but continuing with response');
+      return {};
     }
   }
 

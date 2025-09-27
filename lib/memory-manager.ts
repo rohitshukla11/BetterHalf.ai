@@ -34,7 +34,7 @@ export class MemoryManager {
     this.ogStorage = getOGStorage();
 
     this.config = {
-      openaiApiKey: process.env.OPENAI_API_KEY || '',
+      openaiApiKey: process.env.OPENAI_API_KEY || process.env.NEXT_PUBLIC_OPENAI_API_KEY || '',
       embeddingModel: 'text-embedding-3-small',
       maxVectorSize: 1536,
       similarityThreshold: 0.7,

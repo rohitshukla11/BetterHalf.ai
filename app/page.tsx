@@ -90,7 +90,12 @@ export default function Home() {
       })
       console.log('🧠 Loaded memories:', searchResult.memories.length, 'memories')
       console.log('🧠 Memory data:', searchResult.memories)
-      setMemories(searchResult.memories)
+      
+      // Sort memories by creation date (latest first)
+      const sortedMemories = searchResult.memories.sort((a, b) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      )
+      setMemories(sortedMemories)
       
       // If no memories found, create a test memory
       if (searchResult.memories.length === 0) {
@@ -202,7 +207,8 @@ export default function Home() {
         role: 'assistant',
         timestamp: new Date(),
         explorerUrl: data.explorerUrl,
-        transactionHash: data.transactionHash
+        transactionHash: data.transactionHash,
+        walrusUrl: data.walrusUrl
       }
 
       const updatedMessages = [...personalizedMessages, userMessage, assistantMessage]
@@ -371,13 +377,26 @@ export default function Home() {
 
   const handleDeleteMemory = async (id: string) => {
     try {
-      await memoryService.deleteMemory(id)
+      console.log(`🗑️ Deleting memory: ${id}`);
+      
+      const response = await fetch(`/api/memories/${id}`, {
+        method: 'DELETE'
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete memory');
+      }
+      
+      const result = await response.json();
+      console.log('✅ Memory deleted successfully:', result);
+      
       loadStats()
       loadMemories()
       toast.success('Memory deleted successfully')
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete memory:', error)
-      toast.error('Failed to delete memory')
+      toast.error(`Failed to delete memory: ${error.message}`)
     }
   }
 

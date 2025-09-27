@@ -6,4 +6,5 @@ export interface ChatMessage {
   memoryId?: string;
   explorerUrl?: string;
   transactionHash?: string;
+  walrusUrl?: string;
 }

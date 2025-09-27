@@ -12,6 +12,7 @@ export interface MemoryEntry {
   ipfsHash?: string;
   explorerUrl?: string;
   transactionHash?: string;
+  walrusUrl?: string;
 }
 
 export type MemoryType = 
@@ -62,6 +63,8 @@ export interface MemoryMetadata {
   relatedMemories: string[];
   encryptionKeyId?: string; // For storing encryption key ID
   encryptionSalt?: string; // For storing encryption salt for key regeneration
+  blobId?: string; // For storing 0G/Walrus blob ID
+  storageProvider?: string; // Which storage provider was used
 }
 
 export interface MemorySearchQuery {

@@ -4,4 +4,6 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   timestamp: Date;
   memoryId?: string;
+  explorerUrl?: string;
+  transactionHash?: string;
 }

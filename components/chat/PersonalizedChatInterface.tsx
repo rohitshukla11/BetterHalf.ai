@@ -11,6 +11,8 @@ interface ChatMessage {
   timestamp: Date
   memoryId?: string
   insights?: PersonalInsights
+  explorerUrl?: string
+  transactionHash?: string
 }
 
 interface PersonalInsights {
@@ -255,7 +257,18 @@ export function PersonalizedChatInterface({
                   >
                     {formatTime(message.timestamp)}
                   </p>
-                  {/* Storage links removed - using local storage */}
+                  {/* 0G Explorer Link */}
+                  {message.role === 'assistant' && message.explorerUrl && (
+                    <a
+                      href={message.explorerUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-purple-600 hover:text-purple-800 underline flex items-center space-x-1"
+                      title={`View on 0G Explorer${message.transactionHash ? ` (${message.transactionHash.slice(0, 8)}...)` : ''}`}
+                    >
+                      <span>🔗 0G Explorer</span>
+                    </a>
+                  )}
                 </div>
               </div>
             </div>

@@ -10,6 +10,8 @@ export interface MemoryEntry {
   accessPolicy: AccessPolicy;
   metadata: MemoryMetadata;
   ipfsHash?: string;
+  explorerUrl?: string;
+  transactionHash?: string;
 }
 
 export type MemoryType = 

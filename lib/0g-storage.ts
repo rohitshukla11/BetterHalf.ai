@@ -307,8 +307,12 @@ export class OGStorageService {
     try {
       console.log(`🧠 Computing inference on 0G Compute: ${model}`);
 
-      // 0G Compute integration would require additional setup
-      throw new Error('0G Compute inference not implemented yet');
+      // Use the dedicated 0G Compute service
+      const { callDeployedModel } = await import('./0g-compute');
+      const result = await callDeployedModel(prompt);
+      
+      console.log(`✅ 0G Compute inference completed successfully`);
+      return result;
     } catch (error) {
       console.error('❌ Failed to compute inference on 0G:', error);
       throw new Error(`0G Compute inference failed: ${error?.message}`);

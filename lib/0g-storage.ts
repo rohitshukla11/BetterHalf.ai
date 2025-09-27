@@ -1,5 +1,6 @@
 import { MemoryEntry } from '@/types/memory';
 import { getEncryptionService } from './encryption';
+import { createWalrusStorage, WalrusStorageService } from './walrus-storage';
 
 // Import 0G TypeScript SDK components
 let ZgFile: any, Indexer: any, Batcher: any, KvClient: any, Blob: any, getFlowContract: any;
@@ -72,6 +73,7 @@ export class OGStorageService {
   private provider: any = null;
   private signer: any = null;
   private encryptionService = getEncryptionService();
+  private walrusStorage: WalrusStorageService | null = null;
 
   constructor(config: OGConfig) {
     this.config = config;
@@ -105,16 +107,31 @@ export class OGStorageService {
 
   async initialize(): Promise<void> {
     try {
-      console.log('🔧 Initializing 0G Storage services...');
+      console.log('🔧 Initializing storage services...');
+      
+      // Try Walrus first (now primary)
+      console.log('🦭 Initializing Walrus as primary storage...');
+      try {
+        this.walrusStorage = createWalrusStorage();
+        await this.walrusStorage.initialize();
+        console.log('✅ Walrus primary storage initialized successfully');
+        console.log('   - Connected to Walrus decentralized storage');
+        console.log('   - Ready for high-availability blob storage');
+        console.log('   - Using Walrus testnet endpoints');
+        this.isInitialized = true;
+        return; // Success with Walrus, no need to initialize 0G
+      } catch (walrusError) {
+        console.warn('⚠️ Failed to initialize Walrus primary storage:', walrusError);
+        console.log('🔄 Falling back to 0G storage...');
+      }
 
-      // Check if we have the required SDK components
+      // Fallback to 0G if Walrus fails
       if (ZgFile && Indexer && ethers) {
         try {
-          // Enforce real SDK usage only
           if (!this.config.privateKey || this.config.privateKey === 'your_0g_private_key_here') {
             throw new Error('0G private key not configured. Set NEXT_PUBLIC_0G_PRIVATE_KEY');
           } else {
-            console.log('🔧 Initializing real 0G TypeScript SDK...');
+            console.log('🔧 Initializing 0G as fallback storage...');
             console.log(`   RPC URL: ${this.config.rpcUrl}`);
             console.log(`   Indexer RPC: ${this.config.storageEndpoint}`);
             console.log(`   Explorer URL: ${this.config.explorerUrl}`);
@@ -151,13 +168,13 @@ export class OGStorageService {
             // Initialize indexer for storage operations
             this.indexer = new Indexer(this.config.storageEndpoint);
             
-            console.log('✅ Real 0G TypeScript SDK initialized successfully');
+            console.log('✅ 0G fallback storage initialized successfully');
             console.log('   - Connected to 0G blockchain network');
             console.log('   - Ready for real data storage and retrieval');
             console.log('   - Using official 0G TypeScript SDK');
           }
         } catch (error) {
-          console.error('❌ Failed to initialize real 0G SDK:', error);
+          console.error('❌ Failed to initialize 0G fallback storage:', error);
           throw error;
         }
       } else {
@@ -166,8 +183,8 @@ export class OGStorageService {
 
       this.isInitialized = true;
     } catch (error) {
-      console.error('Failed to initialize 0G services:', error);
-      throw new Error('0G services initialization failed');
+      console.error('❌ Failed to initialize both Walrus and 0G storage systems:', error);
+      throw new Error('All storage systems failed to initialize');
     }
   }
 
@@ -185,10 +202,21 @@ export class OGStorageService {
       await this.initialize();
     }
 
-    // Use real 0G SDK only
+    // Try Walrus first (now primary)
+    if (this.walrusStorage) {
+      try {
+        console.log(`📤 Storing embedding using Walrus primary storage for conversation: ${conversationId}`);
+        return await this.storeEmbeddingOnWalrus(conversationId, vector, metadata);
+      } catch (walrusError) {
+        console.warn('⚠️ Failed to store embedding with Walrus:', walrusError);
+        console.log('🔄 Falling back to 0G storage...');
+      }
+    }
+
+    // Fallback to 0G if Walrus fails
     if (this.indexer && this.signer) {
     try {
-        console.log(`📤 Storing embedding using real 0G SDK for conversation: ${conversationId}`);
+        console.log(`📤 Storing embedding using 0G fallback storage for conversation: ${conversationId}`);
 
       // Create embedding data structure
       const embeddingData = {
@@ -264,13 +292,75 @@ export class OGStorageService {
       };
     } catch (error) {
         console.error('❌ Failed to store embedding with real 0G SDK:', error);
-      throw new Error(`Embedding storage failed: ${error?.message}`);
+      throw new Error(`0G fallback storage failed: ${error?.message}`);
       }
     } else {
-      throw new Error('0G services not initialized - indexer or signer not available');
+      throw new Error('Both Walrus and 0G storage services are unavailable');
     }
   }
 
+  private async storeEmbeddingOnWalrus(
+    conversationId: string,
+    vector: number[],
+    metadata: {
+      agentId: string;
+      timestamp: string;
+      tags: string[];
+      content: string;
+    }
+  ): Promise<OGEmbeddingResult> {
+    if (!this.walrusStorage) {
+      throw new Error('Walrus storage not available');
+    }
+
+    try {
+      console.log(`📤 Storing embedding on Walrus for conversation: ${conversationId}`);
+
+      // Create embedding data structure
+      const embeddingData = {
+        conversationId,
+        vector,
+        metadata: {
+          agentId: metadata.agentId,
+          timestamp: metadata.timestamp,
+          tags: metadata.tags,
+          content: metadata.content,
+          contentHash: await this.generateContentHash(metadata.content)
+        }
+      };
+
+      // Encrypt the embedding data
+      const encryptedData = await this.encryptionService.encrypt(JSON.stringify(embeddingData));
+      const dataString = typeof encryptedData === 'string' ? encryptedData : JSON.stringify(encryptedData);
+      const buffer = Buffer.from(dataString, 'utf-8');
+
+      // Store on Walrus
+      const result = await this.walrusStorage.storeBlob(buffer);
+
+      console.log(`✅ Embedding stored on Walrus successfully:`);
+      console.log(`   Blob ID: ${result.blobId}`);
+      console.log(`   Sui Reference: ${result.suiRef}`);
+      console.log(`   Size: ${result.size} bytes`);
+
+      return {
+        vector,
+        metadata: {
+          conversationId,
+          agentId: metadata.agentId,
+          timestamp: metadata.timestamp,
+          tags: metadata.tags,
+          contentHash: embeddingData.metadata.contentHash
+        },
+        storageId: result.blobId,
+        explorerUrl: result.explorerUrl,
+        transactionHash: result.suiRef
+      };
+
+    } catch (error) {
+      console.error('❌ Failed to store embedding on Walrus:', error);
+      throw new Error(`Walrus embedding storage failed: ${error?.message}`);
+    }
+  }
 
   async queryEmbedding(queryVector: number[], topK: number = 10): Promise<OGEmbeddingResult[]> {
     if (!this.isInitialized) {
@@ -280,15 +370,45 @@ export class OGStorageService {
     try {
       console.log(`🔍 Querying embeddings with top-k: ${topK}`);
 
-      // For now, return empty results as 0G SDK doesn't have built-in vector search
-      // In a real implementation, you would need to implement vector similarity search
-      // or use a separate vector database that can work with 0G storage
-      console.log(`✅ Retrieved 0 similar embeddings (vector search not implemented)`);
+      // Try Walrus first (primary storage)
+      if (this.walrusStorage) {
+        try {
+          console.log(`📥 Retrieving memories from Walrus primary storage`);
+          return await this.queryEmbeddingsFromWalrus(queryVector, topK);
+        } catch (walrusError) {
+          console.warn('⚠️ Failed to query embeddings from Walrus:', walrusError);
+          console.log('🔄 Falling back to 0G storage for queries...');
+        }
+      }
+
+      // Fallback to 0G if Walrus fails
+      if (this.indexer) {
+        console.log(`📥 Retrieving memories from 0G fallback storage`);
+        return await this.queryEmbeddingsFrom0G(queryVector, topK);
+      }
+
+      console.log(`✅ Retrieved 0 embeddings (no storage available)`);
       return [];
     } catch (error) {
-      console.error('❌ Failed to query embeddings from 0G Storage:', error);
+      console.error('❌ Failed to query embeddings from storage:', error);
       throw new Error(`Embedding query failed: ${error?.message}`);
     }
+  }
+
+  private async queryEmbeddingsFromWalrus(queryVector: number[], topK: number): Promise<OGEmbeddingResult[]> {
+    // For now, return empty results as we need to implement a memory index
+    // In a production system, you would maintain an index of stored embeddings
+    // with their blob IDs and metadata for retrieval
+    console.log(`✅ Retrieved 0 embeddings from Walrus (indexing not yet implemented)`);
+    return [];
+  }
+
+  private async queryEmbeddingsFrom0G(queryVector: number[], topK: number): Promise<OGEmbeddingResult[]> {
+    // For now, return empty results as 0G SDK doesn't have built-in vector search
+    // In a real implementation, you would need to implement vector similarity search
+    // or use a separate vector database that can work with 0G storage
+    console.log(`✅ Retrieved 0 embeddings from 0G (vector search not implemented)`);
+    return [];
   }
 
   async generateContentHash(content: string): Promise<string> {

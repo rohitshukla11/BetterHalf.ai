@@ -264,9 +264,9 @@ export function PersonalizedChatInterface({
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-xs text-purple-600 hover:text-purple-800 underline flex items-center space-x-1"
-                      title={`View on 0G Explorer${message.transactionHash ? ` (${message.transactionHash.slice(0, 8)}...)` : ''}`}
+                      title={`View on Blockchain Explorer${message.transactionHash ? ` (${typeof message.transactionHash === 'string' ? message.transactionHash.slice(0, 8) : String(message.transactionHash).slice(0, 8)}...)` : ''}`}
                     >
-                      <span>🔗 0G Explorer</span>
+                      <span>🔗 Blockchain Explorer</span>
                     </a>
                   )}
                 </div>

@@ -80,6 +80,10 @@ export class ChatService {
         const memory = await this.memoryService.createMemory(memoryData);
         console.log('✅ Chat messages saved to local storage with ID:', memory.id);
       }
+
+      // Update cache
+      this.chatCache = messages;
+      this.lastCacheTime = Date.now();
     } catch (error) {
       console.error('❌ Failed to save chat messages:', error);
       throw error;
@@ -87,16 +91,28 @@ export class ChatService {
   }
 
   /**
-   * Load chat messages from local storage
+   * Load chat messages from local storage with caching
    */
-  async loadChatMessages(): Promise<ChatMessage[]> {
+  private chatCache: ChatMessage[] | null = null;
+  private lastCacheTime: number = 0;
+  private readonly CACHE_DURATION = 30000; // 30 seconds
+
+  async loadChatMessages(useCache: boolean = true): Promise<ChatMessage[]> {
     try {
+      // Return cached data if available and fresh
+      if (useCache && this.chatCache && (Date.now() - this.lastCacheTime) < this.CACHE_DURATION) {
+        console.log('💬 Using cached chat messages');
+        return this.chatCache;
+      }
+
       console.log('💬 Loading chat messages from local storage...');
       
       const existingChatMemory = await this.getExistingChatMemory();
       
       if (!existingChatMemory) {
         console.log('No existing chat history found');
+        this.chatCache = [];
+        this.lastCacheTime = Date.now();
         return [];
       }
 
@@ -116,12 +132,37 @@ export class ChatService {
         };
       });
 
+      // Cache the results
+      this.chatCache = messages;
+      this.lastCacheTime = Date.now();
+
       console.log(`📚 Loaded ${messages.length} chat messages from local storage`);
       return messages;
     } catch (error) {
       console.error('❌ Failed to load chat messages:', error);
       return [];
     }
+  }
+
+  /**
+   * Load recent chat messages only (for faster initial load)
+   */
+  async loadRecentChatMessages(limit: number = 20): Promise<ChatMessage[]> {
+    try {
+      const allMessages = await this.loadChatMessages();
+      return allMessages.slice(-limit);
+    } catch (error) {
+      console.error('❌ Failed to load recent chat messages:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Invalidate chat cache
+   */
+  invalidateCache(): void {
+    this.chatCache = null;
+    this.lastCacheTime = 0;
   }
 
   /**

@@ -166,100 +166,95 @@ export class MemoryService {
     console.log('🔍 Searching memories with query:', query);
 
     try {
-      // Use the working direct contract approach
-      const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/memories-from-contract`);
+      let allMemories: MemoryEntry[] = [];
       
-      if (response.ok) {
-        const contractResult = await response.json();
-        if (contractResult.memories && contractResult.memories.length > 0) {
-          console.log(`🔍 Found ${contractResult.memories.length} memories from direct contract query`);
-          
-          // Apply query filters if needed
-          let filteredMemories = contractResult.memories;
-          
-          // Filter out deleted memories
-          const deletedMemories = this.getDeletedMemories();
-          if (deletedMemories.length > 0) {
-            filteredMemories = filteredMemories.filter((memory: MemoryEntry) => 
-              !deletedMemories.includes(memory.id)
-            );
-            console.log(`🗑️ Filtered out ${contractResult.memories.length - filteredMemories.length} deleted memories`);
-          }
-          
-          if (query.query) {
-            filteredMemories = filteredMemories.filter((memory: MemoryEntry) =>
-              memory.content.toLowerCase().includes(query.query.toLowerCase()) ||
-              memory.tags?.some(tag => tag.toLowerCase().includes(query.query.toLowerCase()))
-            );
-          }
-          
-          if (query.type) {
-            filteredMemories = filteredMemories.filter((memory: MemoryEntry) => memory.type === query.type);
-          }
-          
-          if (query.category) {
-            filteredMemories = filteredMemories.filter((memory: MemoryEntry) => memory.category === query.category);
-          }
-          
-          if (query.tags && query.tags.length > 0) {
-            filteredMemories = filteredMemories.filter((memory: MemoryEntry) =>
-              query.tags!.some(tag => memory.tags?.includes(tag))
-            );
-          }
-          
-          // Apply limit and offset
-          const startIndex = query.offset || 0;
-          const endIndex = startIndex + (query.limit || 20);
-          filteredMemories = filteredMemories.slice(startIndex, endIndex);
-          
-          return {
-            memories: filteredMemories,
-            totalCount: filteredMemories.length,
-            facets: this.calculateFacets(filteredMemories)
-          };
-        }
+      // First, get memories from local storage
+      console.log('🔍 Checking local storage for memories...');
+      console.log('🔍 Local memories count:', this.memories.length);
+      
+      if (this.memories.length > 0) {
+        allMemories = [...this.memories];
+        console.log(`🔍 Found ${this.memories.length} memories in local storage`);
       }
-
-      // Fallback to local search if contract query fails
-      console.log('🔍 Contract query failed or returned no results, falling back to local search');
-      const embeddingResults = await this.memoryManager.queryMemory({
-        query: query.query,
-        limit: query.limit || 10,
-        threshold: 0.7
-      });
-
-      // Convert embedding results to memory entries
-      const memories = embeddingResults.map(result => ({
-        id: result.storageId,
-        content: result.metadata.content,
-        type: 'conversation' as MemoryType,
-        category: 'chat',
-        tags: result.metadata.tags,
-        createdAt: new Date(result.metadata.timestamp),
-        updatedAt: new Date(result.metadata.timestamp),
-        encrypted: true,
-        accessPolicy: {
-          owner: result.metadata.agentId,
-          permissions: []
-        } as AccessPolicy,
-        metadata: {
-          size: result.metadata.content.length,
-          checksum: result.metadata.contentHash,
-          version: 1,
-          relatedMemories: [],
-          encryptionKeyId: '',
-          encryptionSalt: ''
-        },
-        ipfsHash: result.storageId
-      }));
-
-      console.log(`🔍 Found ${memories.length} memories from local search`);
-
-      return {
-        memories,
-        totalCount: memories.length,
-        facets: this.calculateFacets(memories)
-      };
+      
+      // Then, try to get memories from contract
+      try {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/memories-from-contract`);
+        
+        if (response.ok) {
+          const contractResult = await response.json();
+          if (contractResult.memories && contractResult.memories.length > 0) {
+            console.log(`🔍 Found ${contractResult.memories.length} memories from contract`);
+            
+            // Merge with local memories, avoiding duplicates
+            const existingIds = new Set(allMemories.map(m => m.id));
+            const newContractMemories = contractResult.memories.filter((memory: MemoryEntry) => !existingIds.has(memory.id));
+            allMemories = [...allMemories, ...newContractMemories];
+            console.log(`🔍 Total memories after merging: ${allMemories.length}`);
+          }
+        }
+      } catch (contractError) {
+        console.warn('⚠️ Failed to fetch from contract, using local memories only:', contractError);
+      }
+      
+      if (allMemories.length > 0) {
+        console.log(`🔍 Processing ${allMemories.length} total memories`);
+        
+        // Apply query filters if needed
+        let filteredMemories = allMemories;
+        
+        // Filter out deleted memories
+        const deletedMemories = this.getDeletedMemories();
+        if (deletedMemories.length > 0) {
+          filteredMemories = filteredMemories.filter((memory: MemoryEntry) => 
+            !deletedMemories.includes(memory.id)
+          );
+          console.log(`🗑️ Filtered out ${allMemories.length - filteredMemories.length} deleted memories`);
+        }
+        
+        if (query.query) {
+          filteredMemories = filteredMemories.filter((memory: MemoryEntry) =>
+            memory.content.toLowerCase().includes(query.query.toLowerCase()) ||
+            memory.tags?.some(tag => tag.toLowerCase().includes(query.query.toLowerCase()))
+          );
+        }
+        
+        if (query.type) {
+          filteredMemories = filteredMemories.filter((memory: MemoryEntry) => memory.type === query.type);
+        }
+        
+        if (query.category) {
+          filteredMemories = filteredMemories.filter((memory: MemoryEntry) => memory.category === query.category);
+        }
+        
+        if (query.tags && query.tags.length > 0) {
+          filteredMemories = filteredMemories.filter((memory: MemoryEntry) =>
+            query.tags!.some(tag => memory.tags?.includes(tag))
+          );
+        }
+        
+        // Apply limit and offset
+        const startIndex = query.offset || 0;
+        const endIndex = startIndex + (query.limit || 20);
+        filteredMemories = filteredMemories.slice(startIndex, endIndex);
+          
+        return {
+          memories: filteredMemories,
+          totalCount: filteredMemories.length,
+          facets: this.calculateFacets(filteredMemories)
+        };
+      } else {
+        console.log('🔍 No memories found in local storage or contract');
+        return {
+          memories: [],
+          totalCount: 0,
+          facets: {
+            types: [],
+            categories: [],
+            tags: []
+          }
+        };
+      }
     } catch (error) {
       console.error('❌ Memory search failed:', error);
       throw error;
@@ -568,19 +563,53 @@ export class MemoryService {
   }
 
   async getStorageStats(): Promise<any> {
-    const ogStats = await this.ogStorage.getStorageStats();
-    const memoryStats = await this.memoryManager.getMemoryStats();
-    const inferenceStats = await this.inferenceClient.getInferenceStats();
+    try {
+      const ogStats = await this.ogStorage.getStorageStats();
+      const memoryStats = await this.memoryManager.getMemoryStats();
+      const inferenceStats = await this.inferenceClient.getInferenceStats();
 
-    return {
-      totalMemories: this.memories.length,
-      storageType: 'hybrid',
-      localCache: this.memories.length,
-      ogStorage: ogStats,
-      memoryManager: memoryStats,
-      inferenceClient: inferenceStats,
-      lastUpdated: new Date().toISOString()
-    };
+      // Get actual total count from all sources
+      let totalMemories = this.memories.length;
+      
+      try {
+        // Get total count from local storage (all memories, not just cached ones)
+        const allLocalMemories = await this.searchMemories({ query: '', limit: 10000 });
+        totalMemories = allLocalMemories.memories.length;
+        
+        // Try to get count from contract if available
+        const contractResponse = await fetch('/api/memories-from-contract');
+        if (contractResponse.ok) {
+          const contractData = await contractResponse.json();
+          if (contractData.memories && contractData.memories.length > 0) {
+            // Use the higher count between local and contract
+            totalMemories = Math.max(totalMemories, contractData.memories.length);
+          }
+        }
+      } catch (error) {
+        console.warn('⚠️ Failed to get accurate memory count:', error);
+      }
+
+      return {
+        totalMemories,
+        storageType: 'hybrid',
+        localCache: this.memories.length,
+        ogStorage: ogStats,
+        memoryManager: memoryStats,
+        inferenceClient: inferenceStats,
+        lastUpdated: new Date().toISOString()
+      };
+    } catch (error) {
+      console.error('❌ Failed to get storage stats:', error);
+      return {
+        totalMemories: this.memories.length,
+        storageType: 'hybrid',
+        localCache: this.memories.length,
+        ogStorage: null,
+        memoryManager: null,
+        inferenceClient: null,
+        lastUpdated: new Date().toISOString()
+      };
+    }
   }
 
   async clearAllMemories(): Promise<void> {

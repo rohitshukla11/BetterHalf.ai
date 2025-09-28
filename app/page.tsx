@@ -28,6 +28,8 @@ export default function Home() {
   })
   const [lastTransactionUrl, setLastTransactionUrl] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'memories' | 'calendar'>('memories')
+  const [isInitializing, setIsInitializing] = useState(true)
+  const [isLoadingMemories, setIsLoadingMemories] = useState(false)
   
   // BetterHalf.ai is now the default and only mode
   const [personalizedMessages, setPersonalizedMessages] = useState<ChatMessage[]>([])
@@ -43,20 +45,30 @@ export default function Home() {
     const initializeApp = async () => {
       try {
         console.log('🚀 Initializing app...')
-        await memoryService.initialize()
-        await chatService.initialize()
+        setIsInitializing(true)
+        
+        // Initialize services in parallel
+        await Promise.all([
+          memoryService.initialize(),
+          chatService.initialize()
+        ])
         console.log('✅ Services initialized')
         
-        await loadStats()
-        await loadMemories()
-        await loadChatHistory()
+        // Load data in parallel for faster startup
+        const [, , chatMessages] = await Promise.allSettled([
+          loadStats(),
+          loadMemories(),
+          loadChatHistory()
+        ])
         
-        // Debug chat persistence
-        await chatService.debugChatPersistence()
+        // Debug chat persistence (non-blocking)
+        chatService.debugChatPersistence().catch(console.warn)
       } catch (error) {
         console.error('Failed to initialize app:', error)
         // Still try to load chat history even if initialization fails
         await loadChatHistory()
+      } finally {
+        setIsInitializing(false)
       }
     }
     
@@ -69,6 +81,7 @@ export default function Home() {
     try {
       const statsData = await memoryService.getStorageStats()
       console.log('📊 Loaded stats:', statsData)
+      console.log('📊 Total memories count:', statsData.totalMemories)
       setStats(statsData)
     } catch (error) {
       console.error('Failed to load stats:', error)
@@ -81,23 +94,36 @@ export default function Home() {
     }
   }
 
-  const loadMemories = async () => {
+  const loadMemories = async (limit: number = 20) => {
     try {
       console.log('🧠 Starting to load memories...')
+      setIsLoadingMemories(true)
 
+      // First, let's check what's in the memory service directly
+      console.log('🧠 Memory service memories count:', memoryService.memories?.length || 0)
+      console.log('🧠 Memory service memories:', memoryService.memories)
+
+      // Load only recent memories for faster initial load
       const [localSearchResult, contractResponse] = await Promise.allSettled([
-        memoryService.searchMemories({ query: '', limit: 100 }), // Increased limit
+        memoryService.searchMemories({ query: '', limit }), // Use pagination
         fetch('/api/memories-from-contract').then(res => res.ok ? res.json() : { memories: [] })
       ]);
+
+      console.log('🧠 Local search result:', localSearchResult)
+      console.log('🧠 Contract response:', contractResponse)
 
       let allMemories: MemoryEntry[] = [];
       if (localSearchResult.status === 'fulfilled') {
         allMemories = [...localSearchResult.value.memories];
         console.log('🧠 Loaded local memories:', localSearchResult.value.memories.length, 'memories')
+        console.log('🧠 Local memories content:', localSearchResult.value.memories)
       }
       if (contractResponse.status === 'fulfilled' && contractResponse.value.memories) {
-        allMemories = [...allMemories, ...contractResponse.value.memories];
-        console.log('🧠 Loaded contract memories:', contractResponse.value.memories.length, 'memories')
+        // Limit contract memories too
+        const contractMemories = contractResponse.value.memories.slice(0, limit)
+        allMemories = [...allMemories, ...contractMemories];
+        console.log('🧠 Loaded contract memories:', contractMemories.length, 'memories')
+        console.log('🧠 Contract memories content:', contractMemories)
       }
 
       const uniqueMemories = Array.from(
@@ -105,8 +131,10 @@ export default function Home() {
       ).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       
       console.log('🧠 Total unique memories:', uniqueMemories.length)
+      console.log('🧠 Unique memories content:', uniqueMemories)
       setMemories(uniqueMemories);
 
+      // Only create test memory if no memories at all
       if (uniqueMemories.length === 0) {
         console.log('🧠 No memories found, creating a test memory...')
         try {
@@ -119,13 +147,11 @@ export default function Home() {
           })
           console.log('🧠 Test memory created:', testMemory)
           
-          // Reload memories after creating test memory
-          const newSearchResult = await memoryService.searchMemories({
-            query: '',
-            limit: 100
-          })
-          console.log('🧠 Reloaded memories after test creation:', newSearchResult.memories.length, 'memories')
-          setMemories(newSearchResult.memories)
+          // Add the test memory directly to the state
+          setMemories([testMemory])
+          
+          // Also refresh stats
+          await loadStats()
         } catch (testError) {
           console.error('Failed to create test memory:', testError)
         }
@@ -133,6 +159,8 @@ export default function Home() {
     } catch (error) {
       console.error('Failed to load memories:', error)
       setMemories([])
+    } finally {
+      setIsLoadingMemories(false)
     }
   }
 
@@ -471,6 +499,9 @@ export default function Home() {
         limit: 100 // Increased limit
       })
       setMemories(searchResult.memories)
+      
+      // Refresh stats to get accurate total count
+      await loadStats()
     } catch (error) {
       console.error('Failed to search memories:', error)
       toast.error('Failed to search memories')
@@ -493,8 +524,12 @@ export default function Home() {
       const result = await response.json();
       console.log('✅ Memory deleted successfully:', result);
       
-      loadStats()
-      loadMemories()
+      // Refresh both stats and memories
+      await Promise.all([
+        loadStats(),
+        loadMemories()
+      ]);
+      
       toast.success('Memory deleted successfully')
     } catch (error: any) {
       console.error('Failed to delete memory:', error)
@@ -537,6 +572,29 @@ export default function Home() {
     const types = new Set(memories.map(m => m.type))
     console.log('🔍 Memory types found:', Array.from(types), 'Total types:', types.size)
     return types.size
+  }
+
+  // Loading skeleton component
+  const LoadingSkeleton = () => (
+    <div className="animate-pulse">
+      <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+      <div className="h-4 bg-gray-200 rounded w-1/2 mb-2"></div>
+      <div className="h-4 bg-gray-200 rounded w-5/6"></div>
+    </div>
+  )
+
+  if (isInitializing) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+            <Heart className="w-8 h-8 text-white" />
+          </div>
+          <h2 className="text-xl font-semibold text-gray-700 mb-2">Loading BetterHalf.ai</h2>
+          <p className="text-gray-500">Initializing your AI companion...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -614,15 +672,31 @@ export default function Home() {
 
         {/* Memory Management - 20% Width */}
         <div className="w-full xl:w-1/5 flex-shrink-0 bg-white overflow-hidden">
-          <MemoryManagement
-            memories={memories}
-            onSearchMemories={handleSearchMemories}
-            onDeleteMemory={handleDeleteMemory}
-            totalMemories={memories.length}
-            memoryTypes={new Set(memories.map(m => m.type)).size}
-            onGrantPermission={handleGrantPermission}
-            onRevokePermission={handleRevokePermission}
-          />
+          {isLoadingMemories ? (
+            <div className="p-4">
+              <div className="animate-pulse">
+                <div className="h-6 bg-gray-200 rounded w-1/2 mb-4"></div>
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="bg-gray-100 rounded p-3">
+                      <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                      <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <MemoryManagement
+              memories={memories}
+              onSearchMemories={handleSearchMemories}
+              onDeleteMemory={handleDeleteMemory}
+              totalMemories={stats.totalMemories || memories.length}
+              memoryTypes={new Set(memories.map(m => m.type)).size}
+              onGrantPermission={handleGrantPermission}
+              onRevokePermission={handleRevokePermission}
+            />
+          )}
         </div>
       </main>
 

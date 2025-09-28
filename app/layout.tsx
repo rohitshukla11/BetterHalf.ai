@@ -1,6 +1,7 @@
 import './globals.css'
 import { Inter } from 'next/font/google'
 import { MemoryProvider } from '@/components/providers/MemoryProvider'
+import { WalletProvider } from '@/components/wallet/WalletContext'
 import { Toaster } from 'react-hot-toast'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -18,21 +19,23 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <MemoryProvider>
-          <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-            {children}
-          </div>
-          <Toaster 
-            position="top-right"
-            toastOptions={{
-              duration: 4000,
-              style: {
-                background: '#363636',
-                color: '#fff',
-              },
-            }}
-          />
-        </MemoryProvider>
+        <WalletProvider>
+          <MemoryProvider>
+            <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+              {children}
+            </div>
+            <Toaster
+              position="top-right"
+              toastOptions={{
+                duration: 4000,
+                style: {
+                  background: '#363636',
+                  color: '#fff',
+                },
+              }}
+            />
+          </MemoryProvider>
+        </WalletProvider>
       </body>
     </html>
   )

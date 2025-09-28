@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { User, Menu, X, Heart, Target, Settings, Trash2 } from 'lucide-react'
+import { Menu, X, Heart, Target, Settings, Trash2 } from 'lucide-react'
+import { WalletButton } from '@/components/wallet/WalletButton'
 
 interface HeaderProps {
   // Chat interface props
@@ -14,7 +15,7 @@ interface HeaderProps {
   insights?: any
 }
 
-export function Header({ 
+export function Header({
   showInsights = false,
   onToggleInsights,
   onShowProfile,
@@ -100,15 +101,8 @@ export function Header({
               </div>
             )}
 
-            {/* User Status */}
-            <div className="flex items-center space-x-3">
-              <div className="flex items-center space-x-1 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg px-2 py-1.5 border border-purple-200">
-                <User className="w-3 h-3 text-purple-600" />
-                <span className="text-xs font-medium text-purple-800">
-                  Local User
-                </span>
-              </div>
-            </div>
+            {/* Wallet Connection Status */}
+            <WalletButton />
           </div>
 
           {/* Mobile Menu Button */}
@@ -141,15 +135,6 @@ export function Header({
               </a>
             </nav>
 
-            {/* Mobile User Status */}
-            <div className="border-t border-purple-200 pt-4">
-              <div className="flex items-center space-x-2 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg px-3 py-2 border border-purple-200">
-                <User className="w-4 h-4 text-purple-600" />
-                <span className="text-sm font-medium text-purple-800">
-                  Local User
-                </span>
-              </div>
-            </div>
           </div>
         )}
       </div>

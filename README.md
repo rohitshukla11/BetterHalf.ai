@@ -1,55 +1,61 @@
-# BetterHalf.ai
+# BetterHalf.ai - Privacy-First AI Companion
 
-Your AI companion for life - a personalized AI assistant that understands your schedule, preferences, and lifestyle to provide tailored recommendations and support. Built with privacy-first design using **0G Storage** for decentralized embeddings, **0G Compute** for decentralized inference, and **0G Chain** for memory verification.
+A decentralized AI companion that learns from your interactions while maintaining complete privacy through blockchain-based memory storage and 0G Labs infrastructure.
 
-## 🏗️ Architecture
+## 🌟 What it does
 
-### Core Components
+BetterHalf.ai is a privacy-first AI companion that provides personalized assistance while ensuring your data remains secure and decentralized. The application combines:
 
-1. **Multi-Agent Memory System**: Decentralized memory sharing between AI agents using 0G Storage
-2. **Decentralized Inference**: LLM inference through 0G Compute Network
-3. **Blockchain Verification**: Memory hash anchoring on 0G Chain for cross-agent verification
-4. **Personalized Chat Interface**: AI conversation tailored to your lifestyle and preferences
-5. **Calendar Integration**: Google Calendar analysis for schedule optimization and insights
-6. **Memory Storage**: 0G Storage for conversation embeddings with local caching
-7. **Encryption**: Advanced encryption for data protection before storage
-8. **UI**: React/Next.js web application
-9. **Lifestyle Recommendations**: Personalized suggestions for meals, workouts, and daily optimization
+- **Personalized AI Chat**: Context-aware conversations that learn from your interactions
+- **Decentralized Memory Storage**: Memories stored on 0G Labs blockchain for verifiability and privacy
+- **Calendar Integration**: Google Calendar sync for event management
+- **Memory Management**: Search, organize, and manage your AI's learned memories
+- **Profile Management**: Personalized user profiles for enhanced AI responses
+- **Privacy-First Design**: All data encrypted and stored locally or on-chain
 
-### Technology Stack
+### Key Features
 
-- **Frontend**: Next.js 14, React 18, TypeScript, Tailwind CSS
-- **Blockchain**: 0G Chain (EVM-compatible) for memory verification
-- **Storage**: 0G Storage for decentralized embeddings with local caching
-- **Compute**: 0G Compute Network for decentralized LLM inference
-- **AI**: OpenAI API integration with 0G Compute fallback
-- **Smart Contracts**: Solidity for memory registry on 0G Chain
+- 🤖 **AI-Powered Conversations**: OpenAI GPT integration for intelligent responses
+- 🧠 **Memory System**: Persistent memory that learns from interactions
+- 🔗 **Blockchain Integration**: 0G Labs testnet for decentralized storage
+- 📅 **Calendar Sync**: Google Calendar integration for event management
+- 🔐 **End-to-End Encryption**: All sensitive data encrypted locally
+- 🎯 **Personalized Insights**: AI-generated insights based on your profile
+- 📱 **Responsive Design**: Modern UI with Tailwind CSS
 
-## 🚀 Quick Start
+## 🚀 How to set it up
 
 ### Prerequisites
 
-- Node.js 18+
-- npm or yarn
+- Node.js 18+ and npm
+- Git
+- MetaMask or compatible Web3 wallet
+- Google Cloud Console account (for Calendar integration)
 - OpenAI API key
-- 0G testnet account (get testnet funds from [0G Faucet](https://faucet.galileo.0g.ai/))
-- Private key for 0G Chain interactions
 
-### Installation
+### 1. Clone the Repository
 
-1. **Clone and install dependencies**:
 ```bash
 git clone <repository-url>
-cd betterhalf-ai
+cd EthGlobalDelhi
+```
+
+### 2. Install Dependencies
+
+```bash
 npm install
 ```
 
-2. **Set up environment variables**:
+### 3. Environment Configuration
+
+Copy the example environment file and configure your variables:
+
 ```bash
 cp env.example .env.local
 ```
 
 Edit `.env.local` with your configuration:
+
 ```env
 # Encryption Configuration
 NEXT_PUBLIC_DEFAULT_ENCRYPTION_PASSWORD=your_secure_encryption_password_here
@@ -60,467 +66,429 @@ OPENAI_API_KEY=your_openai_api_key_here
 # Google Calendar Configuration
 NEXT_PUBLIC_GOOGLE_CLIENT_ID=your_google_client_id_here
 NEXT_PUBLIC_GOOGLE_CLIENT_SECRET=your_google_client_secret_here
-NEXT_PUBLIC_GOOGLE_REDIRECT_URI=https://better-half-ai.vercel.app/auth/google/callback
+NEXT_PUBLIC_GOOGLE_REDIRECT_URI=http://localhost:3000/auth/google/callback
 
-# Application URL (for production)
-NEXT_PUBLIC_APP_URL=https://better-half-ai.vercel.app
+# Application URL
+NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 # 0G Configuration
-NEXT_PUBLIC_0G_RPC_URL=https://rpc.galileo.0g.ai
+NEXT_PUBLIC_0G_RPC_URL=https://evmrpc-testnet.0g.ai/
 NEXT_PUBLIC_0G_CHAIN_ID=galileo
 NEXT_PUBLIC_0G_PRIVATE_KEY=your_0g_private_key_here
-NEXT_PUBLIC_0G_STORAGE_ENDPOINT=https://storage.galileo.0g.ai
+NEXT_PUBLIC_0G_STORAGE_ENDPOINT=https://indexer-storage-testnet-turbo.0g.ai
 NEXT_PUBLIC_0G_COMPUTE_ENDPOINT=https://compute.galileo.0g.ai
+NEXT_PUBLIC_0G_EXPLORER_URL=https://chainscan-galileo.0g.ai
+
+# Walrus Configuration (Fallback Storage)
+NEXT_PUBLIC_WALRUS_PUBLISHER_URL=https://publisher.walrus-testnet.walrus.space
+NEXT_PUBLIC_WALRUS_AGGREGATOR_URL=https://aggregator.walrus-testnet.walrus.space
+NEXT_PUBLIC_WALRUS_EPOCHS=5
 
 # Development
 NODE_ENV=development
 ```
 
-3. **Start the development server**:
+### 4. Smart Contract Deployment
+
+Deploy the MemoryRegistry contract to 0G testnet:
+
 ```bash
-npm run dev
+# Compile contracts
+npx hardhat compile
+
+# Deploy to 0G testnet
+npx hardhat run scripts/deploy.ts --network 0g-testnet
 ```
 
-Visit `http://localhost:3000` to see the application.
+Update the contract address in your environment variables after deployment.
 
-### 0G Integration Setup
+### 5. Google Calendar Setup
 
-1. **Get testnet funds**:
-   - Visit the [0G Faucet](https://faucet.galileo.0g.ai/)
-   - Connect your wallet and request testnet tokens
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select existing one
+3. Enable Google Calendar API
+4. Create OAuth 2.0 credentials
+5. Add authorized redirect URIs:
+   - `http://localhost:3000/auth/google/callback` (development)
+   - `https://your-domain.com/auth/google/callback` (production)
 
-2. **Configure your private key**:
-   - Add your 0G private key to `.env.local`
-   - The app will automatically sync data to 0G Storage and Compute
+## 🏃‍♂️ How to run it
 
-3. **Deploy Memory Registry Contract**:
+### Development Mode
+
    ```bash
-   cd contracts
-   npx hardhat run scripts/deploy.ts --network galileo
-   ```
-   - Copy the deployed contract address to your `.env.local`
+# Start the development server
+npm run dev
 
-4. **Verify storage**:
-   - Check the [0G Explorer](https://explorer.galileo.0g.ai/) to see your stored embeddings
-   - All memories are encrypted before storage and anchored on 0G Chain
-
-## 🔧 0G Architecture
-
-### Memory Flow
-```
-User Query → Embedding Generation → 0G Storage → Semantic Search → LLM Inference → Response
+# Open your browser to http://localhost:3000
 ```
 
-### Components
-- **Memory Manager**: Handles embedding generation, storage, and retrieval
-- **0G Storage Service**: Manages decentralized storage of embeddings
-- **0G Compute Client**: Routes inference requests through 0G Network
-- **Memory Registry Contract**: Anchors memory hashes on 0G Chain for verification
+### Production Build
 
-## 📖 Usage Guide
+```bash
+# Build the application
+npm run build
 
-### For Users
-
-1. **Multi-Agent Conversations**: Chat with AI agents that share decentralized memory
-2. **Semantic Memory Search**: Ask questions and get contextually relevant responses from shared knowledge
-3. **Cross-Agent Verification**: Verify memory integrity across different agents using blockchain anchoring
-4. **Decentralized Inference**: Experience AI responses powered by 0G Compute Network
-5. **Memory Persistence**: All conversations are stored as embeddings in 0G Storage with encryption
-6. **Calendar Integration**: Connect your Google Calendar for personalized insights
-
-### For Developers
-
-#### Creating a Memory with 0G Storage
-
-```typescript
-import { getMemoryManager } from '@/lib/memory-manager'
-
-// Create memory manager for 0G Storage
-const memoryManager = getMemoryManager()
-
-// Store conversation as embedding in 0G Storage
-const result = await memoryManager.storeEmbedding(
-  'conversation_123',
-  'User prefers dark mode in applications',
-  {
-    agentId: 'agent_1',
-    tags: ['preferences', 'ui', 'dark-mode']
-  }
-)
-
-console.log('Embedding stored:', result.storageId)
+# Start production server
+npm start
 ```
 
-#### Semantic Memory Search
+### Available Scripts
 
-```typescript
-// Query memories using semantic search
-const queryResults = await memoryManager.queryMemory({
-  query: "What does the user prefer for UI?",
-  agentId: 'agent_1',
-  limit: 5,
-  threshold: 0.7
-})
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm start` - Start production server
+- `npm run lint` - Run ESLint
+- `npx hardhat compile` - Compile smart contracts
+- `npx hardhat test` - Run contract tests
 
-console.log('Found memories:', queryResults.length)
-queryResults.forEach(result => {
-  console.log('- Content:', result.metadata.content)
-  console.log('- Agent:', result.metadata.agentId)
-  console.log('- Similarity:', result.metadata.timestamp)
-})
+## 📖 Examples
+
+### Basic Usage
+
+1. **Start a Conversation**: Open the app and begin chatting with your AI companion
+2. **Enable Memory Storage**: Toggle the memory switch to let the AI learn from conversations
+3. **View Memories**: Check the memory panel to see what the AI has learned
+4. **Calendar Integration**: Connect your Google Calendar for event management
+
+### API Examples
+
+#### Create a Memory
+
+```bash
+curl -X POST http://localhost:3000/api/memories \
+  -H "Content-Type: application/json" \
+  -d '{
+    "content": "User prefers morning workouts",
+    "type": "preference",
+    "category": "lifestyle",
+    "tags": ["fitness", "schedule"],
+    "encrypted": true
+  }'
 ```
 
-#### Decentralized Inference
+#### Search Memories
 
-```typescript
-import { getInferenceClient } from '@/lib/inference-client'
-
-// Create inference client for 0G Compute
-const inferenceClient = getInferenceClient()
-
-// Generate response using 0G Compute
-const response = await inferenceClient.generateResponse({
-  model: 'llama-2-7b',
-  prompt: 'Explain the user preference for dark mode',
-  context: 'Previous conversation context...',
-  agentId: 'agent_1',
-  conversationId: 'conv_123'
-})
-
-console.log('Response:', response.response)
-console.log('Tokens used:', response.usage.totalTokens)
+```bash
+curl -X GET "http://localhost:3000/api/memories?query=workout&type=preference&limit=10"
 ```
 
-#### Memory Verification
+#### Get Personalized Response
 
-```typescript
-import { getMemoryManager } from '@/lib/memory-manager'
-
-// Verify memory integrity
-const memoryManager = getMemoryManager()
-const isValid = await memoryManager.verifyMemoryIntegrity(memoryResult)
-
-if (isValid) {
-  console.log('✅ Memory integrity verified')
-} else {
-  console.log('❌ Memory integrity check failed')
-}
+```bash
+curl -X POST http://localhost:3000/api/personalized-agent \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userInput": "What should I do this morning?",
+    "previousMessages": []
+  }'
 ```
 
-## 🔐 Security Features
+### Smart Contract Interactions
 
-### Encryption
+#### Commit Memory Hash
 
-- **AES-256-GCM** encryption for memory content before 0G Storage
-- **Key derivation** using PBKDF2
-- **End-to-end encryption** ensuring data privacy in decentralized storage
+```solidity
+// Using the deployed MemoryRegistry contract
+memoryRegistry.commitMemoryHash(
+  keccak256(abi.encodePacked(memoryContent)),
+  "User preference: morning workouts",
+  "zg_storage_id_123",
+  "text",
+  1024,
+  ["fitness", "schedule"]
+);
+```
 
-### Access Control
+#### Verify Memory Hash
 
-- **Per-memory permissions** for fine-grained control
-- **Agent-based access control** for multi-agent scenarios
-- **Owner-only operations** for critical actions
-- **Cross-agent verification** using blockchain anchoring
+```solidity
+memoryRegistry.verifyMemoryHash(memoryHash);
+```
 
-### Privacy
+### Screenshots
 
-- **Zero-knowledge embeddings** - content encrypted before storage
-- **Decentralized storage** with no central authority
-- **User-controlled encryption keys**
-- **Optional metadata obfuscation**
+The application features:
 
-## 🌐 0G API Endpoints
+- **Chat Interface**: Clean, modern chat UI with typing indicators
+- **Memory Panel**: Organized view of AI memories with search and filtering
+- **Calendar View**: Integrated Google Calendar for event management
+- **Profile Management**: User profile setup for personalized experiences
+- **Insights Panel**: AI-generated insights based on user data
 
-### Agent Communication
-- `POST /api/agent/message` - Send message to agent with 0G-backed memory
-- `GET /api/agent/models` - Get available 0G Compute models
+## 🏗️ Architecture
 
-### Memory Operations
-- `POST /api/agent/memory/query` - Semantic search in 0G Storage
-- `POST /api/agent/memory/verify` - Verify memory integrity against blockchain
-- `GET /api/agent/memory/stats` - Get memory and inference statistics
+### Frontend
+- **Next.js 14** with TypeScript
+- **Tailwind CSS** for styling
+- **Framer Motion** for animations
+- **React Hook Form** for form management
+- **Wagmi** for Web3 integration
 
-### Demo Scenarios
-- `POST /api/agent/demo` - Run multi-agent memory sharing demonstrations
+### Backend
+- **Next.js API Routes** for serverless functions
+- **OpenAI API** for AI responses
+- **Google Calendar API** for calendar integration
+- **0G Labs SDK** for blockchain storage
+
+### Smart Contracts
+- **MemoryRegistry.sol**: Solidity contract for memory hash storage
+- **OpenZeppelin** contracts for security and access control
+- **0G Labs** integration for decentralized storage
+
+### Storage
+- **Local Storage**: Encrypted data persistence
+- **0G Labs**: Decentralized memory hash storage
+- **Walrus**: Fallback storage solution
 
 ## 🔧 Configuration
 
-### 0G Storage Configuration
+### Environment Variables
 
-- **Network**: Galileo Testnet (`https://rpc.galileo.0g.ai`)
-- **Storage Endpoint**: `https://storage.galileo.0g.ai`
-- **Compute Endpoint**: `https://compute.galileo.0g.ai`
-- **Chain ID**: `galileo` (16600)
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `OPENAI_API_KEY` | OpenAI API key for AI responses | Yes |
+| `NEXT_PUBLIC_0G_PRIVATE_KEY` | Private key for 0G transactions | Yes |
+| `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | Google OAuth client ID | Yes |
+| `NEXT_PUBLIC_GOOGLE_CLIENT_SECRET` | Google OAuth client secret | Yes |
+| `NEXT_PUBLIC_DEFAULT_ENCRYPTION_PASSWORD` | Encryption password for local data | Yes |
 
-### Memory Registry Contract
+### Network Configuration
 
-- **Contract**: `MemoryRegistry.sol` on 0G Chain
-- **Functions**:
-  - `commitMemoryHash(bytes32 hash, string metadata)` - Anchor memory hash
-  - `verifyMemoryHash(bytes32 hash)` - Cross-agent verification
-  - `getMemoryStats()` - Get network statistics
+The application is configured for 0G Labs testnet:
+- **RPC URL**: `https://evmrpc-testnet.0g.ai/`
+- **Chain ID**: `16602` (Galileo testnet)
+- **Explorer**: `https://chainscan-galileo.0g.ai`
+- **MemoryRegistry Contract**: [`0xe96fb286f36372effcf846f8a0d25773d63a3618`](https://chainscan-galileo.0g.ai/address/0xe96fb286f36372effcf846f8a0d25773d63a3618?tab=transaction)
 
-### Encryption Configuration
+### Deployed Smart Contract
 
-- **Algorithm**: AES-256-GCM
-- **Key Derivation**: PBKDF2 (100,000 iterations)
-- **Salt Length**: 32 bytes
-- **IV Length**: 16 bytes
-- **Embedding Model**: text-embedding-3-small
-
-## 📊 API Examples
-
-### Agent Message with 0G Memory
-
-```bash
-curl -X POST http://localhost:3000/api/agent/message \
-  -H "Content-Type: application/json" \
-  -d '{
-    "message": "What does the user prefer for UI settings?",
-    "agentId": "assistant-1",
-    "conversationId": "conv_123",
-    "model": "llama-2-7b"
-  }'
-```
-
-Response includes:
-- AI response from 0G Compute
-- Retrieved memory context count
-- Memory storage confirmation
-
-### Semantic Memory Search
-
-```bash
-curl -X POST http://localhost:3000/api/agent/memory/query \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "What are the user preferences?",
-    "agentId": "assistant-1",
-    "tags": ["preferences", "ui"],
-    "limit": 5,
-    "threshold": 0.7
-  }'
-```
-
-### Memory Verification
-
-```bash
-curl -X POST http://localhost:3000/api/agent/memory/verify \
-  -H "Content-Type: application/json" \
-  -d '{
-    "memoryId": "0g_1234567890_abc123",
-    "content": "User prefers dark mode in applications"
-  }'
-```
-
-### Multi-Agent Demo
-
-```bash
-curl -X POST http://localhost:3000/api/agent/demo \
-  -H "Content-Type: application/json" \
-  -d '{
-    "scenario": "memory_sharing",
-    "agent1Id": "teacher-agent",
-    "agent2Id": "student-agent",
-    "messages": [
-      "I prefer dark mode for all applications",
-      "I learned about user preferences today"
-    ]
-  }'
-```
-
-## 🧪 Testing
-
-### Unit Tests
-
-```bash
-npm run test
-```
-
-### Integration Tests
-
-```bash
-npm run test:integration
-```
-
-### 0G Integration Tests
-
-```bash
-# Test 0G Storage connectivity
-curl -X GET http://localhost:3000/api/agent/memory/stats
-
-# Test 0G Compute inference
-curl -X POST http://localhost:3000/api/agent/message \
-  -H "Content-Type: application/json" \
-  -d '{"message": "Hello", "agentId": "test-agent", "model": "llama-2-7b"}'
-
-# Test memory operations
-curl -X POST http://localhost:3000/api/agent/demo \
-  -H "Content-Type: application/json" \
-  -d '{"scenario": "memory_sharing", "agent1Id": "agent-1", "agent2Id": "agent-2", "messages": ["Test message"]}'
-```
-
-### Smart Contract Tests
-
-```bash
-cd contracts
-npx hardhat test
-```
-
-### Contract Deployment
-
-```bash
-# Deploy to 0G Galileo testnet
-cd contracts
-npx hardhat run scripts/deploy.ts --network galileo
-
-# Deploy to mainnet
-npx hardhat run scripts/deploy.ts --network mainnet
-```
+**MemoryRegistry Contract Details:**
+- **Contract Address**: `0xe96fb286f36372effcf846f8a0d25773d63a3618`
+- **Network**: 0G Labs Galileo Testnet
+- **Explorer**: [View on 0G Explorer](https://chainscan-galileo.0g.ai/address/0xe96fb286f36372effcf846f8a0d25773d63a3618?tab=transaction)
+- **Status**: Deployed and Active
+- **Functions**: Memory hash storage, verification, and retrieval
+- **Events**: MemoryHashCommitted, MemoryHashVerified, MemoryHashRevoked
 
 ## 🚀 Deployment
 
-### Frontend (Vercel)
+### Fluence VM Deployment
 
-1. Connect your GitHub repository to Vercel
-2. Set environment variables in Vercel dashboard (including 0G configuration)
-3. Deploy automatically on push to main branch
-4. The app will automatically connect to 0G Storage and Compute networks
+BetterHalf.ai is deployed on Fluence Virtual Servers for decentralized hosting.
 
-### Smart Contracts (0G Chain)
+#### Public Endpoint
+- **Application URL**: `https://81.15.150.143:3000`
+- **HTTP Access**: `http://81.15.150.143`
+- **VM ID**: `01998cdd-f445-7f21-bc84-8eedc97f7074`
+- **Status**: Live and accessible
 
+#### Quick Deployment (Automated)
+
+1. **Using the deployment script**:
 ```bash
-# Deploy to 0G Galileo testnet
-cd contracts
-npx hardhat run scripts/deploy.ts --network galileo
+# SSH into your Fluence VM
+ssh root@your-fluence-vm-ip
 
-# Deploy to 0G mainnet
-npx hardhat run scripts/deploy.ts --network mainnet
+# Download and run the deployment script
+curl -O https://raw.githubusercontent.com/your-username/betterhalf-ai/main/scripts/deploy-fluence.sh
+chmod +x deploy-fluence.sh
+sudo ./deploy-fluence.sh
 ```
 
-### Environment Variables for Production
+2. **Using Terraform**:
+```bash
+# Navigate to terraform directory
+cd terraform
 
-Set these in your Vercel dashboard:
-- `OPENAI_API_KEY` - OpenAI API key for embeddings
-- `NEXT_PUBLIC_0G_RPC_URL` - 0G RPC endpoint
-- `NEXT_PUBLIC_0G_CHAIN_ID` - 0G chain ID
-- `NEXT_PUBLIC_0G_PRIVATE_KEY` - Private key for 0G interactions
-- `NEXT_PUBLIC_0G_STORAGE_ENDPOINT` - 0G Storage API endpoint
-- `NEXT_PUBLIC_0G_COMPUTE_ENDPOINT` - 0G Compute API endpoint
+# Initialize Terraform
+terraform init
 
-### Monitoring
+# Plan deployment
+terraform plan
 
-- Check [0G Explorer](https://explorer.galileo.0g.ai/) for stored embeddings
-- Monitor compute usage through 0G Compute dashboard
-- View memory verification status on 0G Chain
+# Deploy to Fluence VM
+terraform apply
+```
+
+#### Manual Deployment Steps
+
+1. **Provision Fluence VM**:
+   - CPU: 2 cores minimum
+   - RAM: 4GB minimum
+   - Storage: 20GB minimum
+   - Open ports: 80, 443, 3000
+
+2. **Install dependencies**:
+```bash
+# Update system
+apt-get update && apt-get upgrade -y
+
+# Install Node.js 18
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+apt-get install -y nodejs
+
+# Install PM2 and Git
+npm install -g pm2
+apt-get install -y git nginx
+```
+
+3. **Deploy application**:
+```bash
+# Clone repository
+git clone https://github.com/your-username/betterhalf-ai.git /opt/betterhalf-ai
+cd /opt/betterhalf-ai
+
+# Install dependencies and build
+npm install
+npm run build
+
+# Configure environment
+cp env.example .env.local
+# Edit .env.local with your configuration
+
+# Start with PM2
+pm2 start npm --name "betterhalf-ai" -- start
+pm2 save
+pm2 startup
+```
+
+4. **Configure Nginx** (optional):
+```bash
+# Use the provided Nginx configuration
+cp nginx.conf /etc/nginx/sites-available/betterhalf-ai
+ln -s /etc/nginx/sites-available/betterhalf-ai /etc/nginx/sites-enabled/
+nginx -t && systemctl restart nginx
+```
+
+#### Deployment Files
+
+- **Terraform Configuration**: `terraform/fluence-vm.tf`
+- **Deployment Script**: `scripts/deploy-fluence.sh`
+- **Nginx Configuration**: `nginx.conf`
+
+### Other Deployment Options
+
+#### Vercel Deployment
+
+1. Connect your GitHub repository to Vercel
+2. Set environment variables in Vercel dashboard
+3. Deploy automatically on push to main branch
+
+#### Manual Deployment
+
+```bash
+# Build the application
+npm run build
+
+# Deploy to your preferred platform
+# (Vercel, Netlify, AWS, etc.)
+```
 
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Commit changes: `git commit -m 'Add amazing feature'`
-4. Push to branch: `git push origin feature/amazing-feature`
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🆘 Support
+## 🌐 Fluence VM Deployment
 
-- **Documentation**: [Wiki](https://github.com/your-repo/wiki)
-- **Issues**: [GitHub Issues](https://github.com/your-repo/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/your-repo/discussions)
-- **Email**: support@your-domain.com
+### Deployment Requirements
 
-## 🎯 0G Integration Summary
+**Fluence Virtual Server Specifications:**
+- **Minimum CPU**: 2 cores
+- **Minimum RAM**: 4GB
+- **Minimum Storage**: 20GB
+- **Required Ports**: 80 (HTTP), 443 (HTTPS), 3000 (Application)
+- **Operating System**: Ubuntu 20.04+ or Debian 11+
 
-This implementation provides a complete **decentralized AI agent system** using 0G's infrastructure:
+### Access Information
 
-### ✅ **Implemented Features**
+**Live Deployment Details:**
+- **Primary URL**: `https://81.15.150.143:3000`
+- **HTTP Fallback**: `http://81.15.150.143`
+- **VM ID**: `01998cdd-f445-7f21-bc84-8eedc97f7074`
+- **VM IP**: `81.15.150.143`
+- **VM Management**: Access via Fluence dashboard
 
-1. **0G Storage Integration**
-   - Embedding generation using OpenAI text-embedding-3-small
-   - Encrypted storage of conversation embeddings
-   - Semantic search with similarity thresholds
-   - Local caching with 0G backup
+### Deployment Verification
 
-2. **0G Compute Integration**
-   - Decentralized LLM inference routing
-   - Fallback to OpenAI when 0G Compute unavailable
-   - Token usage tracking and optimization
-   - Multiple model support (Llama-2, Mistral, etc.)
+To verify your deployment:
 
-3. **0G Chain Integration**
-   - Memory hash anchoring for verification
-   - Cross-agent memory verification
-   - Immutable memory registry contract
-   - Event logging for transparency
-
-4. **Multi-Agent Memory Sharing**
-   - Agents can store and retrieve shared memories
-   - Semantic search across agent boundaries
-   - Memory integrity verification
-   - Collaborative problem-solving scenarios
-
-### 🛠 **Technical Architecture**
-
-```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   AI Agents     │    │  Memory Manager  │    │  0G Storage     │
-├─────────────────┤    ├──────────────────┤    ├─────────────────┤
-│ • Conversation  │◄──►│ • Embedding Gen  │◄──►│ • Vector Store  │
-│ • Memory Query  │    │ • Semantic Search│    │ • Encryption    │
-│ • Verification  │    │ • Integrity Check│    │ • Persistence   │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-         │                        │                        │
-         ▼                        ▼                        ▼
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│  Inference      │    │   0G Compute     │    │  0G Chain       │
-├─────────────────┤    ├──────────────────┤    ├─────────────────┤
-│ • Request Route │◄──►│ • LLM Inference  │    │ • Hash Anchor   │
-│ • Response Gen  │    │ • Model Loading  │    │ • Verification  │
-│ • Fallback      │    │ • Optimization   │    │ • Registry      │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
+1. **Check application status**:
+```bash
+pm2 status
+curl -I https://81.15.150.143:3000
 ```
 
-### 🎮 **Demo Scenarios Available**
+2. **View application logs**:
+```bash
+pm2 logs betterhalf-ai
+```
 
-1. **Memory Sharing**: Two agents share and recall memories
-2. **Knowledge Transfer**: Teacher-student knowledge exchange
-3. **Collaborative Problem Solving**: Multi-agent collaboration
+3. **Test API endpoints**:
+```bash
+curl https://81.15.150.143:3000/api/health
+```
 
-### 🚀 **Quick Start Demo**
+4. **Test contract interaction**:
+```bash
+# Check contract on 0G Explorer
+curl "https://chainscan-galileo.0g.ai/api?module=account&action=balance&address=0xe96fb286f36372effcf846f8a0d25773d63a3618"
+```
+
+5. **Test live application**:
+```bash
+# Test the live BetterHalf.ai application
+curl -X POST https://81.15.150.143:3000/api/personalized-agent \
+  -H "Content-Type: application/json" \
+  -d '{"userInput": "Hello, can you help me test the application?", "previousMessages": []}'
+```
+
+### Environment Configuration
+
+After deployment, update your environment variables:
 
 ```bash
-# 1. Start the application
-npm run dev
+# Edit the environment file
+nano /opt/betterhalf-ai/.env.local
 
-# 2. Test memory sharing
-curl -X POST http://localhost:3000/api/agent/demo \
-  -H "Content-Type: application/json" \
-  -d '{
-    "scenario": "memory_sharing",
-    "agent1Id": "teacher",
-    "agent2Id": "student",
-    "messages": [
-      "I prefer dark mode for all applications",
-      "I learned about user preferences today"
-    ]
-  }'
-
-# 3. Verify embeddings are stored
-curl -X GET http://localhost:3000/api/agent/memory/stats
+# Restart the application
+pm2 restart betterhalf-ai
 ```
 
-## 🙏 Acknowledgments
+### Troubleshooting
 
-- **0G Labs** for providing decentralized AI infrastructure
-- **OpenAI** for AI capabilities and embeddings
-- **Google Calendar API** for integration
-- **CryptoJS** for encryption utilities
-- **TypeScript & Next.js** for the robust development platform
+Common issues and solutions:
+
+1. **Port not accessible**: Ensure ports 80, 443, and 3000 are open in Fluence VM firewall
+2. **Application not starting**: Check logs with `pm2 logs betterhalf-ai`
+3. **Environment variables**: Verify all required environment variables are set
+4. **SSL issues**: Configure SSL certificates for HTTPS access
+
+## 🆘 Support
+
+For support and questions:
+- Create an issue in the GitHub repository
+- Check the documentation in the `/docs` folder
+- Review the API documentation in `/app/api`
+
+## 🔮 Roadmap
+
+- [ ] Multi-agent support
+- [ ] Advanced memory search with vector embeddings
+- [ ] Mobile app development
+- [ ] Integration with more calendar providers
+- [ ] Advanced privacy controls
+- [ ] Memory sharing between users
+- [ ] Voice interaction support
 
 ---
 
-**BetterHalf.ai** - Your decentralized AI companion with shared memory across agents, powered by 0G
+Built with ❤️ for the EthGlobal Delhi hackathon using 0G Labs infrastructure.

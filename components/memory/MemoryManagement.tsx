@@ -244,17 +244,7 @@ export function MemoryManagement({
                       <Calendar className="w-3 h-3" />
                     </button>
                     <button
-                      onClick={() => {
-                        const confirmed = confirm(
-                          'Are you sure you want to delete this memory?\n\n' +
-                          'Note: This will only hide the memory from your local view. ' +
-                          'The data remains permanently stored on the 0G blockchain and Walrus network ' +
-                          'due to their immutable nature.'
-                        );
-                        if (confirmed) {
-                          onDeleteMemory(memory.id);
-                        }
-                      }}
+                      onClick={() => onDeleteMemory(memory.id)}
                       className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-all"
                       title="Hide memory (blockchain data remains immutable)"
                     >

@@ -72,6 +72,14 @@ export function WalletButton() {
     }
   }
 
+  const getTokenSymbol = () => {
+    switch (chainId) {
+      case 16600: return '0G'
+      case 16602: return '0G'
+      default: return 'ETH'
+    }
+  }
+
   // Fetch balance when wallet connects or network changes
   useEffect(() => {
     if (isConnected && provider && address) {
@@ -124,7 +132,7 @@ export function WalletButton() {
       >
         <Coins className="h-4 w-4 text-green-600" />
         <span className="text-sm font-mono text-green-800">
-          {isLoadingBalance ? '...' : `${balance} ETH`}
+          {isLoadingBalance ? '...' : `${balance} ${getTokenSymbol()}`}
         </span>
       </button>
 

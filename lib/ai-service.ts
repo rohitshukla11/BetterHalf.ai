@@ -6,6 +6,7 @@ export interface AIResponse {
   explorerUrl?: string;
   transactionHash?: string;
   walrusUrl?: string;
+  indexingStatus?: string;
 }
 
 export interface AIService {

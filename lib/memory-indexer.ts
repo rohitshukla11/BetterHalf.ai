@@ -110,9 +110,16 @@ export class MemoryIndexer {
         
         // Update memory object with blockchain explorer URL (pending transaction)
         if (result.transactionHash) {
-          memory.explorerUrl = `${process.env.NEXT_PUBLIC_0G_EXPLORER_URL || 'https://chainscan-galileo.0g.ai'}/transaction/${result.transactionHash}`;
+          memory.explorerUrl = `${process.env.NEXT_PUBLIC_0G_EXPLORER_URL || 'https://chainscan-galileo.0g.ai'}/tx/${result.transactionHash}`;
           memory.transactionHash = result.transactionHash;
           console.log(`🔗 0G Explorer URL: ${memory.explorerUrl}`);
+          
+          // Debug: Log the URLs being set in memory-indexer
+          console.log('🔍 MEMORY-INDEXER SETTING:', {
+            explorerUrl: memory.explorerUrl,
+            transactionHash: result.transactionHash,
+            memoryId: memory.id
+          });
         }
         
         // Update local config with transaction info

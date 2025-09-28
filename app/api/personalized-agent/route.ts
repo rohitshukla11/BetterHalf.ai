@@ -46,6 +46,7 @@ export async function POST(request: NextRequest) {
       explorerUrl: response.explorerUrl,
       transactionHash: response.transactionHash,
       walrusUrl: response.walrusUrl,
+      indexingStatus: response.indexingStatus,
       insights
     });
 

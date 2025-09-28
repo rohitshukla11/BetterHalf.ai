@@ -99,13 +99,19 @@ export class PersonalizedAgentService {
       // Learn from interaction
       try {
         const memoryResult = await this.learnFromInteraction(userInput, response);
-        return {
+        console.log('🔍 MEMORY RESULT FROM LEARNING:', memoryResult);
+        
+        const finalResponse = {
           content: response,
           shouldStore: true,
           explorerUrl: memoryResult.explorerUrl,
           transactionHash: memoryResult.transactionHash,
-          walrusUrl: memoryResult.walrusUrl
+          walrusUrl: memoryResult.walrusUrl,
+          indexingStatus: memoryResult.indexingStatus
         };
+        
+        console.log('🔍 FINAL RESPONSE BEING RETURNED:', finalResponse);
+        return finalResponse;
       } catch (learningError) {
         console.error('❌ LEARNING FAILED - Returning response without learning:', learningError);
         // Return response without learning if learning fails
@@ -621,8 +627,10 @@ Current date and time: ${new Date().toLocaleString()}`;
     return data.choices[0]?.message?.content || 'I apologize, but I could not generate a response.';
   }
 
-  private async learnFromInteraction(userInput: string, aiResponse: string): Promise<{ explorerUrl?: string; transactionHash?: string; walrusUrl?: string }> {
+  private async learnFromInteraction(userInput: string, aiResponse: string): Promise<{ explorerUrl?: string; transactionHash?: string; walrusUrl?: string; indexingStatus?: string }> {
     try {
+      console.log('🔍 LEARN FROM INTERACTION STARTED');
+      
       // Store interaction patterns and preferences (limit content size more aggressively)
       const truncatedInput = userInput.length > 50 ? userInput.substring(0, 50) + '...' : userInput;
       const truncatedResponse = aiResponse.length > 75 ? aiResponse.substring(0, 75) + '...' : aiResponse;
@@ -630,6 +638,7 @@ Current date and time: ${new Date().toLocaleString()}`;
       // Analyze the interaction to determine appropriate memory attributes
       const memoryAttributes = this.analyzeInteractionForMemory(userInput, aiResponse);
       
+      // Create memory but don't wait for indexing to complete
       const memory = await this.memoryService.createMemory({
         content: memoryAttributes.content,
         type: memoryAttributes.type,
@@ -650,27 +659,20 @@ Current date and time: ${new Date().toLocaleString()}`;
 
       console.log('✅ Learning interaction stored successfully');
       
-      // Construct explorer URLs immediately if we have the necessary data
-      const explorerUrl = memory.transactionHash 
-        ? `${process.env.NEXT_PUBLIC_0G_EXPLORER_URL || 'https://chainscan-galileo.0g.ai'}/transaction/${memory.transactionHash}`
-        : memory.explorerUrl;
-        
+      // Return Walrus URL immediately, don't wait for 0G indexing
       const walrusUrl = memory.ipfsHash && memory.ipfsHash.startsWith('0x')
         ? `https://walruscan.com/testnet/blob/${memory.ipfsHash}`
         : memory.walrusUrl;
       
-      console.log('📊 Memory URLs:', {
-        explorerUrl,
-        transactionHash: memory.transactionHash,
+      const result = {
+        explorerUrl: undefined, // Don't return 0G explorer URL until indexing is complete
+        transactionHash: undefined, // Don't return tx hash until indexing is complete
         walrusUrl,
-        ipfsHash: memory.ipfsHash
-      });
-      
-      return {
-        explorerUrl,
-        transactionHash: memory.transactionHash,
-        walrusUrl
+        indexingStatus: 'Data stored in Walrus.'
       };
+      
+      console.log('🔍 LEARN FROM INTERACTION RETURNING:', result);
+      return result;
     } catch (error: any) {
       console.error('❌ LEARNING INTERACTION ERROR:', error);
       

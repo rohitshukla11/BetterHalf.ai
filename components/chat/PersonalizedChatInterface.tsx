@@ -269,6 +269,7 @@ export function PersonalizedChatInterface({
                           rel="noopener noreferrer"
                           className="text-xs text-purple-600 hover:text-purple-800 underline flex items-center space-x-1"
                           title={`View on 0G Blockchain Explorer${message.transactionHash ? ` (${typeof message.transactionHash === 'string' ? message.transactionHash.slice(0, 8) : String(message.transactionHash).slice(0, 8)}...)` : ''}`}
+                          onClick={() => console.log('🔍 UI CHAT EXPLORER URL CLICKED:', { explorerUrl: message.explorerUrl, transactionHash: message.transactionHash, messageId: message.id })}
                         >
                           <span>⛓️ 0G Explorer</span>
                         </a>

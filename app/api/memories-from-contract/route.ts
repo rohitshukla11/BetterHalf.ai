@@ -67,8 +67,23 @@ export async function GET() {
       
       console.log(`📊 Total unique memory hashes found: ${allMemoryHashes.size}`);
       
+      // Query events to get actual transaction hashes for memories
+      const currentBlock = await provider.getBlockNumber();
+      const fromBlock = Math.max(0, currentBlock - 100000); // Increased range
+      const filter = contract.filters.MemoryHashCommitted();
+      const events = await contract.queryFilter(filter, fromBlock, currentBlock);
+      let eventTxHashes: Map<string, string> = new Map();
+      events.forEach(event => {
+        const memoryHash = (event as any).args?.hash;
+        const txHash = event.transactionHash;
+        if (memoryHash && txHash) {
+          eventTxHashes.set(memoryHash.toLowerCase(), txHash);
+        }
+      });
+      console.log(`📊 Found ${eventTxHashes.size} MemoryHashCommitted events with transaction hashes`);
+      
       // Convert each unique memory hash to MemoryEntry
-      for (const memoryHash of Array.from(allMemoryHashes).slice(0, 20)) { // Limit to 20
+      for (const memoryHash of Array.from(allMemoryHashes)) { // No limit - return all memories
         try {
           console.log(`📖 Reading memory: ${memoryHash.slice(0, 8)}...`);
           const memoryData = await contract.getMemoryHash(memoryHash);
@@ -97,8 +112,10 @@ export async function GET() {
               storageProvider: '0g-storage'
             },
             ipfsHash: memoryData.zgStorageId,
-            transactionHash: memoryHash,
-            explorerUrl: `${process.env.NEXT_PUBLIC_0G_EXPLORER_URL || 'https://chainscan-galileo.0g.ai'}/transaction/${memoryHash}`,
+            transactionHash: eventTxHashes.get(memoryHash.toLowerCase()) || memoryHash, // Use actual tx hash if available
+            explorerUrl: eventTxHashes.get(memoryHash.toLowerCase()) 
+              ? `${process.env.NEXT_PUBLIC_0G_EXPLORER_URL || 'https://chainscan-galileo.0g.ai'}/tx/${eventTxHashes.get(memoryHash.toLowerCase())}`
+              : undefined, // Only set explorer URL if we have the actual transaction hash
             walrusUrl: memoryData.zgStorageId ? `https://walruscan.com/testnet/blob/${memoryData.zgStorageId}` : undefined
           };
           

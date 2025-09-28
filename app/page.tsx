@@ -84,21 +84,30 @@ export default function Home() {
   const loadMemories = async () => {
     try {
       console.log('🧠 Starting to load memories...')
-      const searchResult = await memoryService.searchMemories({
-        query: '',
-        limit: 20
-      })
-      console.log('🧠 Loaded memories:', searchResult.memories.length, 'memories')
-      console.log('🧠 Memory data:', searchResult.memories)
+
+      const [localSearchResult, contractResponse] = await Promise.allSettled([
+        memoryService.searchMemories({ query: '', limit: 100 }), // Increased limit
+        fetch('/api/memories-from-contract').then(res => res.ok ? res.json() : { memories: [] })
+      ]);
+
+      let allMemories: MemoryEntry[] = [];
+      if (localSearchResult.status === 'fulfilled') {
+        allMemories = [...localSearchResult.value.memories];
+        console.log('🧠 Loaded local memories:', localSearchResult.value.memories.length, 'memories')
+      }
+      if (contractResponse.status === 'fulfilled' && contractResponse.value.memories) {
+        allMemories = [...allMemories, ...contractResponse.value.memories];
+        console.log('🧠 Loaded contract memories:', contractResponse.value.memories.length, 'memories')
+      }
+
+      const uniqueMemories = Array.from(
+        new Map(allMemories.map(memory => [memory.id, memory])).values()
+      ).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       
-      // Sort memories by creation date (latest first)
-      const sortedMemories = searchResult.memories.sort((a, b) => 
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      )
-      setMemories(sortedMemories)
-      
-      // If no memories found, create a test memory
-      if (searchResult.memories.length === 0) {
+      console.log('🧠 Total unique memories:', uniqueMemories.length)
+      setMemories(uniqueMemories);
+
+      if (uniqueMemories.length === 0) {
         console.log('🧠 No memories found, creating a test memory...')
         try {
           const testMemory = await memoryService.createMemory({
@@ -113,7 +122,7 @@ export default function Home() {
           // Reload memories after creating test memory
           const newSearchResult = await memoryService.searchMemories({
             query: '',
-            limit: 20
+            limit: 100
           })
           console.log('🧠 Reloaded memories after test creation:', newSearchResult.memories.length, 'memories')
           setMemories(newSearchResult.memories)
@@ -201,9 +210,12 @@ export default function Home() {
         timestamp: new Date().toISOString()
       });
       
+      // Use the content as-is without adding any status messages
+      let messageContent = data.content;
+
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
-        content: data.content,
+        content: messageContent,
         role: 'assistant',
         timestamp: new Date(),
         explorerUrl: data.explorerUrl,
@@ -211,8 +223,19 @@ export default function Home() {
         walrusUrl: data.walrusUrl
       }
 
+      // Debug: Log the URLs being set in UI
+      console.log('🔍 UI CHAT MESSAGE CREATED:', {
+        explorerUrl: data.explorerUrl,
+        transactionHash: data.transactionHash,
+        walrusUrl: data.walrusUrl,
+        indexingStatus: data.indexingStatus,
+        messageId: assistantMessage.id
+      })
+
       const updatedMessages = [...personalizedMessages, userMessage, assistantMessage]
       setPersonalizedMessages(updatedMessages)
+
+      // No polling needed - just show the AI response
 
       // Update insights if provided
       if (data.insights) {
@@ -298,6 +321,85 @@ export default function Home() {
     }
   }
 
+  const pollForIndexingCompletion = async (messageId: string) => {
+    let attempts = 0;
+    const maxAttempts = 30; // Poll for up to 5 minutes (10s intervals)
+    
+    const poll = async () => {
+      attempts++;
+      try {
+        // Check if any recent memories have been indexed
+        const contractResponse = await fetch('/api/memories-from-contract');
+        if (contractResponse.ok) {
+          const contractData = await contractResponse.json();
+          const recentMemories = contractData.memories?.slice(0, 10) || []; // Check last 10 memories
+          
+          // Find a memory that matches our content (simple matching by content similarity)
+          let matchingMemory = null;
+          
+          // First, try to find by timestamp (memories created in the last 2 minutes)
+          const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
+          const recentMemoriesByTime = recentMemories.filter(memory => 
+            new Date(memory.createdAt) > twoMinutesAgo
+          );
+          
+          if (recentMemoriesByTime.length > 0) {
+            // Take the most recent one within the time window
+            matchingMemory = recentMemoriesByTime.sort((a, b) => 
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+            )[0];
+            
+          console.log('🔍 Found matching memory by timestamp:', {
+            memoryId: matchingMemory.id,
+            createdAt: matchingMemory.createdAt,
+            transactionHash: matchingMemory.transactionHash,
+            explorerUrl: matchingMemory.explorerUrl
+          });
+          }
+          
+          if (matchingMemory && matchingMemory.explorerUrl) {
+            // Update the message with 0G explorer link
+            setPersonalizedMessages(prevMessages => 
+              prevMessages.map(msg => {
+                if (msg.id === messageId && !msg.explorerUrl) {
+                  const updatedContent = msg.content.replace(
+                    /📦.*Data stored in Walrus\./,
+                    `✅ Memory indexed on 0G blockchain!\n🔗 [View on 0G Explorer](${matchingMemory.explorerUrl})`
+                  );
+                  
+                  console.log('🔄 Updated message with 0G explorer link:', matchingMemory.explorerUrl);
+                  
+                  return {
+                    ...msg,
+                    content: updatedContent,
+                    explorerUrl: matchingMemory.explorerUrl,
+                    transactionHash: matchingMemory.transactionHash
+                  };
+                }
+                return msg;
+              })
+            );
+            return; // Stop polling
+          }
+        }
+        
+        if (attempts < maxAttempts) {
+          setTimeout(poll, 10000); // Poll every 10 seconds
+        } else {
+          console.log('⏰ Polling timeout - indexing may still be in progress');
+        }
+      } catch (error) {
+        console.warn('⚠️ Error polling for indexing completion:', error);
+        if (attempts < maxAttempts) {
+          setTimeout(poll, 10000);
+        }
+      }
+    };
+    
+    // Start polling after 15 seconds (give indexing time to start)
+    setTimeout(poll, 15000);
+  }
+
   // Profile Management Functions
   const loadUserProfile = async () => {
     try {
@@ -366,7 +468,7 @@ export default function Home() {
       const searchResult = await memoryService.searchMemories({
         query,
         type: 'conversation',
-        limit: 20
+        limit: 100 // Increased limit
       })
       setMemories(searchResult.memories)
     } catch (error) {
